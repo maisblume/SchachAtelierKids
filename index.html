@@ -1,0 +1,2237 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Schach-Abenteuer</title>
+<meta name="description" content="Schach-Abenteuer für Kids: spielend Schach lernen mit einem Coach, der mitdenkt.">
+<meta name="theme-color" content="#f0dfd0">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-apple-touch.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Schach-Abenteuer">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root { --radius: 14px; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Nunito', sans-serif;
+  background: #f0dfd0;
+  color: #3f3038;
+  padding-bottom: 40px;
+}
+.app { max-width: 560px; margin: 0 auto; padding: 16px; }
+
+/* ---- Header ---- */
+.header { text-align: center; margin-bottom: 14px; position: relative; }
+.header-btn {
+  position: absolute; top: 0;
+  background: none; border: none; font-size: 20px; cursor: pointer;
+  opacity: 0.65; padding: 4px 8px;
+}
+.title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 30px; margin: 0 0 4px; padding: 0 118px 0 8px; }
+.subtitle { font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 14px; opacity: 0.7; }
+.header-badge {
+  position: absolute; top: -4px; right: -6px; background: #e0522e; color: #fff;
+  font-size: 10px; font-weight: 800; border-radius: 10px; min-width: 16px; height: 16px;
+  display: none; align-items: center; justify-content: center; padding: 0 3px;
+  font-family: 'Nunito', sans-serif; line-height: 1;
+}
+.header-badge.show { display: flex; }
+
+/* ---- Tabs / rows ---- */
+.diff-row { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.diff-btn {
+  flex: 1;
+  min-width: 68px;
+  padding: 12px 6px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 2px solid #d9bfa8;
+  background: #e9d4c3;
+  color: #6b5560;
+  font-family: 'Nunito', sans-serif;
+  opacity: 0.85;
+}
+.diff-btn.active { opacity: 1; background: #e8899e; color: #fff; border-color: #e8899e; }
+.diff-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.section-label { font-size: 12px; font-weight: 800; opacity: 0.6; margin: 4px 2px 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+.adaptive-status { text-align: center; font-size: 12.5px; font-weight: 700; opacity: 0.75; margin: -6px 0 12px; }
+
+/* ---- Status ---- */
+.status-bar {
+  text-align: center; padding: 14px; border-radius: 10px; margin-bottom: 12px;
+  font-size: 16px; font-weight: 600; min-height: 20px;
+  background: #e9d4c3; border: 2px solid #d9bfa8;
+}
+
+/* ---- Single coach line (replaces the old stack of separate boxes) ---- */
+.coach-line {
+  border-radius: 12px; padding: 12px 14px; font-size: 15px; margin-bottom: 12px;
+  font-family: 'Nunito', sans-serif; font-weight: 600; display: none;
+  background: #fff; border: 2px dashed #a8c9e0;
+}
+.coach-line.show { display: block; }
+.coach-line.tone-threat { background: #ffe3de; border-color: #e0522e; }
+.coach-line.tone-good { background: #d7f0c2; border-color: #7cb35a; }
+.coach-line.tone-hint { background: #fff2d6; border-color: #e0a95a; }
+.coach-line.tone-tip { background: #fff; border-color: #f0b8c5; }
+
+/* ---- Settings sections inside the ⚙️ overlay ---- */
+.settings-section-label { font-size: 12px; font-weight: 800; opacity: 0.6; margin: 14px 2px 6px; text-transform: uppercase; letter-spacing: 0.03em; text-align: left; }
+.settings-section-label:first-child { margin-top: 0; }
+
+/* ---- Streak toast ---- */
+.streak-toast, .level-toast {
+  position: fixed; left: 50%; top: 14px; transform: translateX(-50%);
+  background: #3f3038; color: #fff; padding: 12px 20px; border-radius: 30px;
+  font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 15px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+  z-index: 80; opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.streak-toast.show, .level-toast.show { opacity: 1; transform: translateX(-50%) translateY(6px); }
+
+/* ---- Board ---- */
+.board-wrap { margin-bottom: 4px; }
+.board {
+  display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; width: 100%;
+  user-select: none; border: 3px solid #3f3038;
+}
+.sq { display: flex; align-items: center; justify-content: center; font-size: clamp(30px, 10vw, 52px); cursor: pointer; position: relative; }
+.sq:nth-child(16n+1), .sq:nth-child(16n+3), .sq:nth-child(16n+5), .sq:nth-child(16n+7),
+.sq:nth-child(16n+10), .sq:nth-child(16n+12), .sq:nth-child(16n+14), .sq:nth-child(16n+16) { background: #ffd28a; }
+.sq:nth-child(16n+2), .sq:nth-child(16n+4), .sq:nth-child(16n+6), .sq:nth-child(16n+8),
+.sq:nth-child(16n+9), .sq:nth-child(16n+11), .sq:nth-child(16n+13), .sq:nth-child(16n+15) { background: #6bc4b6; }
+.piece { position: relative; z-index: 2; line-height: 1; }
+.piece-w { color: #f7f3ea; text-shadow: -1.5px -1.5px 0 #1a1410, 1.5px -1.5px 0 #1a1410, -1.5px 1.5px 0 #1a1410, 1.5px 1.5px 0 #1a1410, 0 2px 3px rgba(0,0,0,0.35); }
+.piece-b { color: #191410; text-shadow: -1.5px -1.5px 0 #f7f3ea, 1.5px -1.5px 0 #f7f3ea, -1.5px 1.5px 0 #f7f3ea, 1.5px 1.5px 0 #f7f3ea, 0 2px 3px rgba(0,0,0,0.25); }
+.sq .hint { position: absolute; width: 26%; height: 26%; border-radius: 50%; opacity: 0.55; background: #4a7fb5; }
+.sq .hint.capture { width: 80%; height: 80%; border-radius: 50%; background: transparent; border: 4px solid #e8899e; opacity: 0.55; }
+.sq.selected { outline: 3px solid #e8899e; outline-offset: -3px; }
+.sq.last-move::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0.18; pointer-events: none; }
+.sq.in-check::after { content: ''; position: absolute; inset: 6%; border-radius: 50%; background: radial-gradient(circle, rgba(220,40,30,0.75) 0%, rgba(220,40,30,0.35) 55%, rgba(220,40,30,0) 80%); pointer-events: none; z-index: 1; }
+.coord-label { position: absolute; font-size: 12px; font-weight: 700; opacity: 0.6; pointer-events: none; line-height: 1; z-index: 3; }
+.coord-label.rank { top: 3px; left: 4px; }
+.coord-label.file { bottom: 2px; right: 4px; }
+.sq.threatened::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 3px solid #e0522e; opacity: 0.6; pointer-events: none; }
+
+/* ---- Controls ---- */
+.controls { display: flex; gap: 8px; margin-bottom: 10px; }
+.btn { flex: 1; padding: 16px; border-radius: 10px; border: none; font-weight: 700; font-size: 16px; cursor: pointer; background: #e8899e; color: #fff; font-family: 'Fredoka', sans-serif; }
+.btn.secondary { background: #e9d4c3; color: #6b5560; border: 2px solid #d9bfa8; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ---- Captured pieces ---- */
+.captured-row { display: flex; justify-content: space-between; font-size: 24px; margin-bottom: 8px; min-height: 24px; opacity: 0.8; }
+
+.history-toggle-row { margin-top: 4px; }
+.history-toggle-row .btn { width: 100%; }
+.move-history { max-height: 160px; overflow-y: auto; margin-top: 8px; padding: 8px 10px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: #fff; border: 2px solid #d9bfa8; color: #5a4a2f; }
+.hist-row { display: flex; gap: 8px; padding: 2px 0; }
+.hist-num { opacity: 0.55; width: 24px; flex-shrink: 0; color: #e8899e; }
+.hist-move { flex: 1; }
+.hist-empty { opacity: 0.55; font-style: italic; }
+
+/* ---- Warum-nicht bar ---- */
+.warum-bar { display: none; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: #fff; border: 2px dashed #a8c9e0; font-weight: 700; font-size: 14px; }
+.warum-bar.show { display: block; }
+.warum-actions { display: flex; gap: 8px; margin-top: 10px; }
+.warum-actions .btn { padding: 10px; font-size: 13.5px; }
+
+/* ---- Modals ---- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.modal-overlay.show { display: flex; }
+.modal { border-radius: 14px; padding: 20px; text-align: center; background: #f0dfd0; color: #3f3038; border: 3px solid #3f3038; max-width: 440px; width: 100%; max-height: 85vh; overflow-y: auto; }
+.modal .promo-row { display: flex; gap: 10px; margin-top: 12px; justify-content: center; }
+.modal .promo-btn { font-size: 32px; padding: 8px 14px; border-radius: 10px; border: none; cursor: pointer; background: #ffd28a; }
+.result-emoji { font-size: 40px; margin-bottom: 8px; }
+.result-text { font-size: 18px; font-weight: 700; margin-bottom: 4px; font-family: 'Fredoka', sans-serif; }
+.result-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.result-actions .btn { flex: 1; min-width: 100px; }
+
+/* ---- Review overlay ---- */
+.review-item { text-align: left; background: #fff; border: 2px solid #d9bfa8; border-radius: 12px; padding: 12px; margin-bottom: 10px; cursor: pointer; }
+.review-item .ri-head { display: flex; justify-content: space-between; align-items: center; font-weight: 800; margin-bottom: 4px; font-family: 'Fredoka', sans-serif; }
+.review-item .ri-text { font-size: 13.5px; opacity: 0.85; }
+.review-board { display: none; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); aspect-ratio: 1/1; border-radius: 8px; overflow: hidden; margin: 10px 0; border: 2px solid #3f3038; }
+.review-board.show { display: grid; }
+.review-board .sq { font-size: clamp(16px, 6vw, 26px); cursor: default; }
+.review-empty { opacity: 0.6; font-size: 13.5px; padding: 10px 0; }
+
+/* ---- Fehler-Trainer board — an interactive mini version of the main board ---- */
+.trainer-board {
+  display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; border: 3px solid #3f3038;
+  margin: 6px 0; user-select: none;
+}
+.trainer-board .sq { display: flex; align-items: center; justify-content: center; font-size: clamp(20px, 7vw, 34px); cursor: pointer; position: relative; }
+.trainer-board .sq:nth-child(16n+1), .trainer-board .sq:nth-child(16n+3), .trainer-board .sq:nth-child(16n+5), .trainer-board .sq:nth-child(16n+7),
+.trainer-board .sq:nth-child(16n+10), .trainer-board .sq:nth-child(16n+12), .trainer-board .sq:nth-child(16n+14), .trainer-board .sq:nth-child(16n+16) { background: #ffd28a; }
+.trainer-board .sq:nth-child(16n+2), .trainer-board .sq:nth-child(16n+4), .trainer-board .sq:nth-child(16n+6), .trainer-board .sq:nth-child(16n+8),
+.trainer-board .sq:nth-child(16n+9), .trainer-board .sq:nth-child(16n+11), .trainer-board .sq:nth-child(16n+13), .trainer-board .sq:nth-child(16n+15) { background: #6bc4b6; }
+.trainer-board .sq.selected { outline: 3px solid #e8899e; outline-offset: -3px; }
+.trainer-board .sq.was-played { position: relative; }
+.trainer-board .sq.was-played::before { content: ''; position: absolute; inset: 0; background: #e0a95a; opacity: 0.45; pointer-events: none; }
+.trainer-board .sq.was-played-from::after { content: '①'; position: absolute; top: 1px; left: 2px; font-size: 11px; font-weight: 800; color: #5a4526; z-index: 2; }
+.trainer-board .sq.was-played-to::after { content: '②'; position: absolute; top: 1px; left: 2px; font-size: 11px; font-weight: 800; color: #5a4526; z-index: 2; }
+.trainer-board .sq .hint { position: absolute; width: 24%; height: 24%; border-radius: 50%; opacity: 0.55; background: #4a7fb5; }
+.trainer-board .sq .hint.capture { width: 78%; height: 78%; border-radius: 50%; background: transparent; border: 4px solid #e8899e; opacity: 0.55; }
+.trainer-empty { opacity: 0.7; font-size: 14px; padding: 14px 4px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1 class="title">Schach-Abenteuer 🦊</h1>
+    <div class="subtitle">Spielend lernen.</div>
+    <button class="header-btn" id="mistakeTrainerBtn" title="Fehler-Training" style="right:76px;">🧠<span class="header-badge" id="mistakeBadge"></span></button>
+    <button class="header-btn" id="soundToggleBtn" title="Ton an/aus" style="right:38px;">🔊</button>
+    <button class="header-btn" id="settingsOpenBtn" title="Einstellungen &amp; Sicherung" style="right:0;">⚙️</button>
+  </div>
+
+  <div class="coach-line" id="coachLine"></div>
+
+  <div class="warum-bar" id="warumBar">
+    <div id="warumText">🤔 Bist du sicher? Das sieht nach einem großen Verlust aus.</div>
+    <div class="warum-actions">
+      <button class="btn" id="warumConfirmBtn">Trotzdem ziehen ✅</button>
+      <button class="btn secondary" id="warumCancelBtn">Anderen Zug wählen ↩️</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar">Weiß ist am Zug</div>
+
+  <div class="captured-row">
+    <div id="capturedByWhite"></div>
+    <div id="capturedByBlack"></div>
+  </div>
+
+  <div class="board-wrap">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="controls" id="mainControlsRow" style="margin-top:10px;">
+    <button class="btn" id="newGameBtn">Neue Partie</button>
+    <button class="btn secondary" id="undoBtn">Zug zurück</button>
+    <button class="btn secondary" id="statsBtn">📊</button>
+  </div>
+
+  <div class="history-toggle-row">
+    <button class="btn secondary" id="historyToggleBtn">📜 Zughistorie</button>
+  </div>
+  <div id="moveHistoryPanel" class="move-history" style="display:none;"></div>
+
+</div>
+
+<div class="streak-toast" id="streakToast"></div>
+<div class="level-toast" id="levelToast"></div>
+
+<div class="modal-overlay" id="promoOverlay">
+  <div class="modal">
+    <div id="promoTitle">Figur wählen</div>
+    <div class="promo-row" id="promoRow"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="resultOverlay">
+  <div class="modal" id="resultModalBox">
+    <div class="result-emoji" id="resultEmoji">🏆</div>
+    <div class="result-text" id="resultText">Schachmatt!</div>
+    <div class="result-actions">
+      <button class="btn" id="resultNewGameBtn">Neue Partie</button>
+      <button class="btn secondary" id="resultReviewBtn">📖 Rückblick</button>
+      <button class="btn secondary" id="resultCloseBtn">Brett ansehen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reviewOverlay">
+  <div class="modal" id="reviewModalBox">
+    <div class="result-text" style="margin-bottom:10px;">📖 Partie-Rückblick</div>
+    <div id="reviewContent"></div>
+    <div class="review-board" id="reviewBoard"></div>
+    <div class="result-actions">
+      <button class="btn secondary" id="reviewCloseBtn">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="statsOverlay">
+  <div class="modal" id="statsModalBox">
+    <div class="result-text" style="margin-bottom:10px;">📊 Statistik</div>
+    <div id="statsContent" style="text-align:left; font-size:14px; line-height:1.7;"></div>
+    <div class="result-actions">
+      <button class="btn secondary" id="statsResetBtn">Zurücksetzen</button>
+      <button class="btn secondary" id="statsCloseBtn">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="trainerOverlay">
+  <div class="modal" id="trainerModalBox">
+    <div class="result-text" style="margin-bottom:2px;">🧠 Fehler-Training</div>
+    <div id="trainerTurnLabel" style="font-size:13px; font-weight:800; opacity:0.7; margin-bottom:8px;"></div>
+    <div id="trainerContext" class="coach-line tone-hint show" style="margin-bottom:10px;"></div>
+    <div id="trainerPrompt" style="font-size:14.5px; font-weight:700; margin-bottom:10px;"></div>
+    <div class="trainer-board" id="trainerBoard"></div>
+    <div id="trainerFeedback" class="coach-line" style="margin-top:12px;"></div>
+    <div class="result-actions">
+      <button class="btn" id="trainerNextBtn" style="display:none;">Nächstes Rätsel</button>
+      <button class="btn secondary" id="trainerCloseBtn">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal" id="settingsModalBox">
+    <div class="result-text" style="margin-bottom:2px;">⚙️ Einstellungen</div>
+
+    <div class="settings-section-label">Wer spielt?</div>
+    <div class="diff-row" id="colorRow">
+      <button class="diff-btn active" data-color="w">♔ Weiß</button>
+      <button class="diff-btn" data-color="b">♚ Schwarz</button>
+    </div>
+
+    <div class="settings-section-label">Wie stark ist der Fuchs?</div>
+    <div class="diff-row" id="kidsDiffRow">
+      <button class="diff-btn" data-kidsdiff="verylight">🐣 Sehr leicht</button>
+      <button class="diff-btn" data-kidsdiff="light">🐰 Leicht</button>
+      <button class="diff-btn" data-kidsdiff="normal">🦊 Normal</button>
+      <button class="diff-btn" data-kidsdiff="hard">🦉 Schwer</button>
+      <button class="diff-btn active" data-kidsdiff="adaptive">🧭 Adaptiv</button>
+    </div>
+    <div class="adaptive-status" id="adaptiveStatus"></div>
+    <div class="result-actions" style="margin-top:0;">
+      <button class="btn secondary" id="adaptiveResetBtn">🔄 Fuchs-Niveau zurücksetzen</button>
+    </div>
+
+    <div class="settings-section-label">Persönlichkeit</div>
+    <div class="diff-row" id="kidsPersonalityRow">
+      <button class="diff-btn active" data-kidspersonality="balanced">🐿️ Ausgewogen</button>
+      <button class="diff-btn" data-kidspersonality="aggressive">🦁 Mutiger Löwe</button>
+      <button class="diff-btn" data-kidspersonality="solid">🐢 Schildkröte</button>
+      <button class="diff-btn" data-kidspersonality="positional">🦅 Kluger Adler</button>
+    </div>
+
+    <div class="settings-section-label">Hilfen auf dem Brett</div>
+    <div class="diff-row" id="kidsHelpRow">
+      <button class="diff-btn active" data-help="moves">🎯 Zughinweise</button>
+      <button class="diff-btn active" data-help="threats">⚠️ Bedrohungen</button>
+      <button class="diff-btn active" data-help="tips">💡 Reaktionen</button>
+    </div>
+
+    <div class="settings-section-label">Coach 🧙‍♂️</div>
+    <div class="diff-row" id="kidsCoachRow">
+      <button class="diff-btn" data-kidscoach="suggest">🧙‍♂️ Zauber-Tipp</button>
+      <button class="diff-btn" data-kidscoach="evaluate">🌟 Zugbewertung</button>
+      <button class="diff-btn" data-kidscoach="goal">🎯 Ziel-Tipp</button>
+    </div>
+    <div class="diff-row" id="warnRow">
+      <button class="diff-btn active" data-warn="blunder">🤔 Bei großen Fehlern kurz nachfragen</button>
+    </div>
+
+    <div class="settings-section-label">Sicherung</div>
+    <div class="result-actions" style="margin-top:0;">
+      <button class="btn" id="backupExportBtn">Exportieren</button>
+      <button class="btn secondary" id="backupImportBtn">Importieren</button>
+    </div>
+    <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
+
+    <div class="result-actions">
+      <button class="btn secondary" id="settingsCloseBtn">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==== Chess rules engine (dependency-free) ==== */
+function emptyBoard() { return Array.from({length:8}, () => Array(8).fill(null)); }
+
+function standardStart() {
+  const b = emptyBoard();
+  const back = ['r','n','b','q','k','b','n','r'];
+  for (let c=0;c<8;c++){
+    b[0][c] = {type: back[c], color:'b'};
+    b[1][c] = {type:'p', color:'b'};
+    b[6][c] = {type:'p', color:'w'};
+    b[7][c] = {type: back[c], color:'w'};
+  }
+  return {board:b, backRank: back};
+}
+
+function cloneBoard(b){ return b.map(row=>row.map(p=>p?{...p}:null)); }
+function inBounds(r,c){ return r>=0&&r<8&&c>=0&&c<8; }
+function sqName(r,c){ return 'abcdefgh'[c]+(8-r); }
+function squareToRC(sq){ const c = 'abcdefgh'.indexOf(sq[0]); const r = 8 - parseInt(sq[1],10); return {r,c}; }
+
+class ChessGame {
+  constructor(opts={}) {
+    this.chess960 = false;
+    if (opts.customPieces) {
+      this.board = emptyBoard();
+      for (const p of opts.customPieces) {
+        const rc = squareToRC(p.square);
+        this.board[rc.r][rc.c] = { type: p.type, color: p.color };
+      }
+      this.backRank = null;
+      this.kingFile = 4;
+      this.rookFilesWhite = [];
+      this.rookFilesBlack = [];
+      this.turn = opts.turn || 'w';
+      this.castling = { wK:false, wQ:false, bK:false, bQ:false };
+    } else {
+      const setup = standardStart();
+      this.board = setup.board;
+      this.backRank = setup.backRank;
+      this.kingFile = setup.backRank.indexOf('k');
+      const rookFiles = setup.backRank.reduce((a,t,i)=>{ if(t==='r') a.push(i); return a; },[]);
+      this.rookFilesWhite = rookFiles;
+      this.rookFilesBlack = rookFiles;
+      this.turn = 'w';
+      this.castling = { wK:true, wQ:true, bK:true, bQ:true };
+    }
+    this.epTarget = null;
+    this.history = [];
+    this.captured = { w: [], b: [] };
+    this.halfmoveClock = 0;
+    this.positionCounts = {};
+    this.positionCounts[this.positionKey()] = 1;
+  }
+
+  positionKey(){
+    let s = this.turn + '|';
+    for (let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = this.board[r][c];
+      s += p ? p.color+p.type : '.';
+    }
+    s += '|' + (this.castling.wK?1:0) + (this.castling.wQ?1:0) + (this.castling.bK?1:0) + (this.castling.bQ?1:0);
+    s += '|' + (this.epTarget ? sqName(this.epTarget.r,this.epTarget.c) : '-');
+    return s;
+  }
+
+  findKingOn(board,color){
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = board[r][c];
+      if (p && p.type==='k' && p.color===color) return {r,c};
+    }
+    return null;
+  }
+
+  isSquareAttacked(r, c, byColor, board=this.board){
+    const dir = byColor==='w' ? 1 : -1;
+    for (const dc of [-1,1]){
+      const pr=r+dir, pc=c+dc;
+      if (inBounds(pr,pc)){
+        const p = board[pr][pc];
+        if (p && p.color===byColor && p.type==='p') return true;
+      }
+    }
+    const nMoves=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+    for (const [dr,dc] of nMoves){
+      const rr=r+dr, cc=c+dc;
+      if (inBounds(rr,cc)){
+        const p = board[rr][cc];
+        if (p && p.color===byColor && p.type==='n') return true;
+      }
+    }
+    for (let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+      if (!dr&&!dc) continue;
+      const rr=r+dr, cc=c+dc;
+      if (inBounds(rr,cc)){
+        const p = board[rr][cc];
+        if (p && p.color===byColor && p.type==='k') return true;
+      }
+    }
+    const diagDirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+    for (const [dr,dc] of diagDirs){
+      let rr=r+dr, cc=c+dc;
+      while(inBounds(rr,cc)){
+        const p = board[rr][cc];
+        if (p){ if (p.color===byColor && (p.type==='b'||p.type==='q')) return true; break; }
+        rr+=dr; cc+=dc;
+      }
+    }
+    const straightDirs=[[-1,0],[1,0],[0,-1],[0,1]];
+    for (const [dr,dc] of straightDirs){
+      let rr=r+dr, cc=c+dc;
+      while(inBounds(rr,cc)){
+        const p = board[rr][cc];
+        if (p){ if (p.color===byColor && (p.type==='r'||p.type==='q')) return true; break; }
+        rr+=dr; cc+=dc;
+      }
+    }
+    return false;
+  }
+
+  inCheck(color, board=this.board){
+    const k = this.findKingOn(board, color);
+    if (!k) return false;
+    return this.isSquareAttacked(k.r,k.c, color==='w'?'b':'w', board);
+  }
+
+  pseudoMoves(r,c,board=this.board){
+    const p = board[r][c];
+    if (!p) return [];
+    const moves=[];
+    const push=(rr,cc,flags={})=>{ if(inBounds(rr,cc)) moves.push({from:{r,c},to:{r:rr,c:cc},...flags}); };
+    if (p.type==='p'){
+      const dir = p.color==='w' ? -1 : 1;
+      const startRow = p.color==='w' ? 6 : 1;
+      const promoRow = p.color==='w' ? 0 : 7;
+      if (inBounds(r+dir,c) && !board[r+dir][c]){
+        if (r+dir===promoRow) push(r+dir,c,{promotion:true});
+        else push(r+dir,c);
+        if (r===startRow && !board[r+2*dir][c]) push(r+2*dir,c,{double:true});
+      }
+      for (const dc of [-1,1]){
+        const rr=r+dir, cc=c+dc;
+        if (inBounds(rr,cc)){
+          const target=board[rr][cc];
+          if (target && target.color!==p.color){
+            if (rr===promoRow) push(rr,cc,{promotion:true, capture:true});
+            else push(rr,cc,{capture:true});
+          } else if (this.epTarget && this.epTarget.r===rr && this.epTarget.c===cc){
+            push(rr,cc,{capture:true, enpassant:true});
+          }
+        }
+      }
+    } else if (p.type==='n'){
+      const nMoves=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+      for (const [dr,dc] of nMoves){
+        const rr=r+dr, cc=c+dc;
+        if (inBounds(rr,cc)){
+          const t=board[rr][cc];
+          if (!t || t.color!==p.color) push(rr,cc,{capture:!!t});
+        }
+      }
+    } else if (p.type==='k'){
+      for (let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+        if (!dr&&!dc) continue;
+        const rr=r+dr, cc=c+dc;
+        if (inBounds(rr,cc)){
+          const t=board[rr][cc];
+          if (!t || t.color!==p.color) push(rr,cc,{capture:!!t});
+        }
+      }
+    } else {
+      let dirs=[];
+      if (p.type==='b') dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+      if (p.type==='r') dirs=[[-1,0],[1,0],[0,-1],[0,1]];
+      if (p.type==='q') dirs=[[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+      for (const [dr,dc] of dirs){
+        let rr=r+dr, cc=c+dc;
+        while(inBounds(rr,cc)){
+          const t=board[rr][cc];
+          if (!t){ push(rr,cc); }
+          else { if (t.color!==p.color) push(rr,cc,{capture:true}); break; }
+          rr+=dr; cc+=dc;
+        }
+      }
+    }
+    return moves;
+  }
+
+  castlingMoves(color){
+    const moves=[];
+    const homeRow = color==='w' ? 7 : 0;
+    const rights = color==='w' ? {K:this.castling.wK,Q:this.castling.wQ} : {K:this.castling.bK,Q:this.castling.bQ};
+    const kingFrom = {r:homeRow, c:this.kingFile};
+    const kp = this.board[homeRow][this.kingFile];
+    if (!kp || kp.type!=='k' || kp.color!==color) return moves;
+    if (this.inCheck(color)) return moves;
+    const rookFiles = color==='w' ? this.rookFilesWhite : this.rookFilesBlack;
+    const rfK = rookFiles.filter(f=>f>this.kingFile).sort((a,b)=>a-b)[0];
+    const rfQ = rookFiles.filter(f=>f<this.kingFile).sort((a,b)=>b-a)[0];
+    const tryCastle = (side, rookFile) => {
+      if (rookFile===undefined) return;
+      if (side==='K' && !rights.K) return;
+      if (side==='Q' && !rights.Q) return;
+      const rp = this.board[homeRow][rookFile];
+      if (!rp || rp.type!=='r' || rp.color!==color) return;
+      const kingToFile = side==='K' ? 6 : 2;
+      const rookToFile = side==='K' ? 5 : 3;
+      const touched = new Set();
+      const lo1=Math.min(this.kingFile,kingToFile), hi1=Math.max(this.kingFile,kingToFile);
+      for(let f=lo1;f<=hi1;f++) touched.add(f);
+      const lo2=Math.min(rookFile,rookToFile), hi2=Math.max(rookFile,rookToFile);
+      for(let f=lo2;f<=hi2;f++) touched.add(f);
+      touched.delete(this.kingFile); touched.delete(rookFile);
+      for (const f of touched){ if (this.board[homeRow][f]) return; }
+      const step = kingToFile>this.kingFile ? 1 : (kingToFile<this.kingFile?-1:0);
+      let f=this.kingFile;
+      do {
+        const tempBoard = cloneBoard(this.board);
+        tempBoard[homeRow][this.kingFile]=null;
+        tempBoard[homeRow][rookFile]=null;
+        tempBoard[homeRow][f]={type:'k',color};
+        if (this.isSquareAttacked(homeRow,f, color==='w'?'b':'w', tempBoard)) return;
+        if (f===kingToFile) break;
+        f+=step;
+      } while(true);
+      moves.push({from:kingFrom, to:{r:homeRow,c:kingToFile}, castle:side, rookFrom:{r:homeRow,c:rookFile}, rookTo:{r:homeRow,c:rookToFile}});
+    };
+    tryCastle('K', rfK);
+    tryCastle('Q', rfQ);
+    return moves;
+  }
+
+  applyMoveRaw(move, board=this.board){
+    const p = board[move.from.r][move.from.c];
+    if (move.enpassant){ board[move.from.r][move.to.c] = null; }
+    board[move.to.r][move.to.c] = move.promotion ? {type: move.promoteTo||'q', color:p.color} : p;
+    board[move.from.r][move.from.c] = null;
+    if (move.castle){
+      const rp = board[move.rookFrom.r][move.rookFrom.c];
+      board[move.rookTo.r][move.rookTo.c]=rp;
+      if (move.rookFrom.r!==move.rookTo.r || move.rookFrom.c!==move.rookTo.c) board[move.rookFrom.r][move.rookFrom.c]=null;
+    }
+  }
+
+  legalMoves(color=this.turn){
+    const all=[];
+    for (let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p=this.board[r][c];
+      if (p && p.color===color){
+        for (const m of this.pseudoMoves(r,c)){
+          const testBoard = cloneBoard(this.board);
+          this.applyMoveRaw(m, testBoard);
+          if (!this.inCheck(color, testBoard)) all.push(m);
+        }
+      }
+    }
+    all.push(...this.castlingMoves(color));
+    return all;
+  }
+
+  move(m){
+    const legal = this.legalMoves(this.turn);
+    const found = legal.find(lm => lm.from.r===m.from.r&&lm.from.c===m.from.c&&lm.to.r===m.to.r&&lm.to.c===m.to.c && (!lm.castle || m.castle===undefined || lm.castle===m.castle));
+    if (!found) return null;
+    if (found.promotion) found.promoteTo = m.promoteTo || 'q';
+    const piece = this.board[found.from.r][found.from.c];
+    const capturedPiece = found.enpassant ? this.board[found.from.r][found.to.c] : this.board[found.to.r][found.to.c];
+    if (capturedPiece) this.captured[capturedPiece.color].push(capturedPiece.type);
+
+    this.halfmoveClock = (piece.type==='p' || capturedPiece) ? 0 : this.halfmoveClock + 1;
+
+    if (piece.type==='k'){
+      if (piece.color==='w'){ this.castling.wK=false; this.castling.wQ=false; }
+      else { this.castling.bK=false; this.castling.bQ=false; }
+    }
+    if (piece.type==='r'){
+      const rookFiles = piece.color==='w'?this.rookFilesWhite:this.rookFilesBlack;
+      if (found.from.c===Math.max(...rookFiles)) { if(piece.color==='w') this.castling.wK=false; else this.castling.bK=false; }
+      if (found.from.c===Math.min(...rookFiles)) { if(piece.color==='w') this.castling.wQ=false; else this.castling.bQ=false; }
+    }
+    this.epTarget = found.double ? {r:(found.from.r+found.to.r)/2, c:found.from.c} : null;
+    this.applyMoveRaw(found, this.board);
+    found.san = this.toSAN(found, piece);
+    this.history.push(found);
+    this.turn = this.turn==='w' ? 'b' : 'w';
+    const key = this.positionKey();
+    this.positionCounts[key] = (this.positionCounts[key] || 0) + 1;
+    return found;
+  }
+
+  toSAN(found, piece){
+    if (found.castle==='K') return 'O-O';
+    if (found.castle==='Q') return 'O-O-O';
+    const letters={n:'N',b:'B',r:'R',q:'Q',k:'K'};
+    let s='';
+    if (piece.type==='p'){
+      if (found.capture) s += 'abcdefgh'[found.from.c]+'x';
+      s += sqName(found.to.r,found.to.c);
+      if (found.promotion) s += '='+letters[found.promoteTo||'q'];
+    } else {
+      s += letters[piece.type];
+      if (found.capture) s += 'x';
+      s += sqName(found.to.r,found.to.c);
+    }
+    return s;
+  }
+
+  gameStatus(){
+    const color=this.turn;
+    const moves = this.legalMoves(color);
+    const check = this.inCheck(color);
+    if (moves.length===0) return check ? 'checkmate' : 'stalemate';
+    if (this.halfmoveClock >= 100) return 'draw-fifty';
+    if ((this.positionCounts[this.positionKey()] || 0) >= 3) return 'draw-repetition';
+    return check ? 'check' : 'ongoing';
+  }
+}
+
+/* ==== Evaluation + minimax (used for the coach reference and the "hard" tier) ==== */
+const VALUES = {p:100,n:320,b:330,r:500,q:900,k:0};
+const PAWN_TABLE = [
+  0,0,0,0,0,0,0,0,
+  50,50,50,50,50,50,50,50,
+  10,10,20,30,30,20,10,10,
+  5,5,10,25,25,10,5,5,
+  0,0,0,20,20,0,0,0,
+  5,-5,-10,0,0,-10,-5,5,
+  5,10,10,-20,-20,10,10,5,
+  0,0,0,0,0,0,0,0
+];
+const KNIGHT_TABLE = [
+  -50,-40,-30,-30,-30,-30,-40,-50,
+  -40,-20,0,0,0,0,-20,-40,
+  -30,0,10,15,15,10,0,-30,
+  -30,5,15,20,20,15,5,-30,
+  -30,0,15,20,20,15,0,-30,
+  -30,5,10,15,15,10,5,-30,
+  -40,-20,0,5,5,0,-20,-40,
+  -50,-40,-30,-30,-30,-30,-40,-50
+];
+
+function evaluate(game){
+  let score = 0;
+  for (let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p = game.board[r][c];
+    if (!p) continue;
+    let val = VALUES[p.type];
+    const idx = p.color==='w' ? r*8+c : (7-r)*8+c;
+    if (p.type==='p') val += PAWN_TABLE[idx]*0.5;
+    if (p.type==='n') val += KNIGHT_TABLE[idx]*0.5;
+    score += p.color==='w' ? val : -val;
+  }
+  if (Math.abs(score) >= 600) {
+    const winner = score > 0 ? 'w' : 'b';
+    let wk=null, bk=null;
+    for (let r=0;r<8;r++) for(let c=0;c<8;c++){
+      const p = game.board[r][c];
+      if (p && p.type==='k'){ if(p.color==='w') wk={r,c}; else bk={r,c}; }
+    }
+    const loserKing = winner==='w' ? bk : wk;
+    const winnerKing = winner==='w' ? wk : bk;
+    if (loserKing && winnerKing){
+      const centerDist = Math.max(Math.abs(loserKing.r-3.5), Math.abs(loserKing.c-3.5));
+      const kingDist = Math.max(Math.abs(loserKing.r-winnerKing.r), Math.abs(loserKing.c-winnerKing.c));
+      const mateBonus = centerDist*14 - kingDist*4;
+      score += winner==='w' ? mateBonus : -mateBonus;
+    }
+  }
+  return score;
+}
+
+function minimax(game, depth, alpha, beta, maximizing){
+  const status = game.gameStatus();
+  if (status==='checkmate') return maximizing ? -100000-depth : 100000+depth;
+  if (status==='stalemate') return 0;
+  if (depth===0) return evaluate(game);
+
+  const moves = game.legalMoves(game.turn);
+  if (maximizing){
+    let best=-Infinity;
+    for (const m of moves){
+      const snap = snapshot(game);
+      game.move(m);
+      best = Math.max(best, minimax(game, depth-1, alpha, beta, false));
+      restore(game, snap);
+      alpha = Math.max(alpha, best);
+      if (beta<=alpha) break;
+    }
+    return best;
+  } else {
+    let best=Infinity;
+    for (const m of moves){
+      const snap = snapshot(game);
+      game.move(m);
+      best = Math.min(best, minimax(game, depth-1, alpha, beta, true));
+      restore(game, snap);
+      beta = Math.min(beta, best);
+      if (beta<=alpha) break;
+    }
+    return best;
+  }
+}
+
+function snapshot(game){
+  return {
+    board: cloneBoard(game.board),
+    castling: {...game.castling},
+    ep: game.epTarget,
+    turn: game.turn,
+    captured: {w:[...game.captured.w], b:[...game.captured.b]},
+    halfmoveClock: game.halfmoveClock,
+    positionCounts: {...game.positionCounts}
+  };
+}
+function restore(game, snap){
+  game.board = snap.board;
+  game.castling = snap.castling;
+  game.epTarget = snap.ep;
+  game.turn = snap.turn;
+  game.captured = snap.captured;
+  game.halfmoveClock = snap.halfmoveClock;
+  game.positionCounts = snap.positionCounts;
+  game.history.pop();
+}
+
+/* ==== Kids AI: fallible on purpose, tuned across four base tiers ====
+   In "Adaptiv" mode the effective configuration is interpolated between two
+   neighbouring tiers using a continuous 0–3 skill level (see the Adaptive
+   Engine section below), so strength changes gradually instead of jumping. */
+function isSafeCapture(game, move){
+  const snap = snapshot(game);
+  game.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo || 'q' });
+  const opponent = game.turn;
+  const attacked = game.isSquareAttacked(move.to.r, move.to.c, opponent);
+  restore(game, snap);
+  return !attacked;
+}
+
+function kidsPersonalityBonus(game, move, personality){
+  if (!personality || personality === 'balanced') return 0;
+  if (personality === 'aggressive'){ return move.capture ? 2 : 0; }
+  if (personality === 'solid'){ return move.capture ? 0 : 1; }
+  if (personality === 'positional'){
+    const centerFiles=[2,3,4,5], centerRanks=[3,4,5,6];
+    return (centerFiles.includes(move.to.c) && centerRanks.includes(move.to.r)) ? 1 : 0;
+  }
+  return 0;
+}
+
+const KIDS_TIER_ORDER = ['verylight','light','normal','hard'];
+const KIDS_TIER_CONFIGS = {
+  verylight: { randomRate: 0.85, depth: 0, freeCaptureRate: 0.75 },
+  light:     { randomRate: 0.45, depth: 0, freeCaptureRate: 0.85 },
+  normal:    { randomRate: 0.35, depth: 1, freeCaptureRate: 0.9 },
+  hard:      { randomRate: 0.15, depth: 2, freeCaptureRate: 0.95 }
+};
+const KIDS_TIER_EMOJI = { verylight: '🐣', light: '🐰', normal: '🦊', hard: '🦉' };
+const KIDS_TIER_LABEL = { verylight: 'Sehr leicht', light: 'Leicht', normal: 'Normal', hard: 'Schwer' };
+
+// Interpolates the four discrete tiers into a smooth 0..3 scale so the
+// adaptive engine can nudge strength gradually rather than jumping tiers.
+function configFromLevel(level){
+  level = Math.max(0, Math.min(3, level));
+  const lo = Math.floor(level), hi = Math.min(3, Math.ceil(level));
+  const t = level - lo;
+  const a = KIDS_TIER_CONFIGS[KIDS_TIER_ORDER[lo]], b = KIDS_TIER_CONFIGS[KIDS_TIER_ORDER[hi]];
+  return {
+    randomRate: a.randomRate + (b.randomRate - a.randomRate) * t,
+    depth: Math.round(a.depth + (b.depth - a.depth) * t),
+    freeCaptureRate: a.freeCaptureRate + (b.freeCaptureRate - a.freeCaptureRate) * t
+  };
+}
+function tierIndexFromLevel(level){ return Math.round(Math.max(0, Math.min(3, level))); }
+function tierNameFromLevel(level){ return KIDS_TIER_ORDER[tierIndexFromLevel(level)]; }
+
+function chooseKidsMove(game, tierOrConfig, personality){
+  const moves = game.legalMoves(game.turn);
+  if (moves.length===0) return null;
+  const config = typeof tierOrConfig === 'string' ? (KIDS_TIER_CONFIGS[tierOrConfig] || KIDS_TIER_CONFIGS.verylight) : tierOrConfig;
+
+  const captures = moves.filter(m=>m.capture);
+  if (captures.length){
+    const freeCaptures = captures.filter(m=>isSafeCapture(game, m));
+    if (freeCaptures.length && Math.random() < config.freeCaptureRate){
+      if (freeCaptures.length > 1 && personality && personality !== 'balanced'){
+        let best = freeCaptures[0], bestBonus = -Infinity;
+        for (const m of freeCaptures){
+          const bonus = kidsPersonalityBonus(game, m, personality);
+          if (bonus > bestBonus){ bestBonus = bonus; best = m; }
+        }
+        return best;
+      }
+      return freeCaptures[Math.floor(Math.random()*freeCaptures.length)];
+    }
+  }
+
+  if (Math.random() < config.randomRate){
+    return moves[Math.floor(Math.random()*moves.length)];
+  }
+
+  if (config.depth === 0){
+    if (captures.length){
+      let best = captures[0], bestVal = -1;
+      for (const c of captures){
+        const target = game.board[c.to.r][c.to.c];
+        const val = target ? VALUES[target.type] : 0;
+        if (val > bestVal){ bestVal = val; best = c; }
+      }
+      return best;
+    }
+    return moves[Math.floor(Math.random()*moves.length)];
+  }
+
+  const color = game.turn;
+  const maximizing = color==='w';
+  let bestMoves=[]; let bestScore = maximizing ? -Infinity : Infinity;
+  for (const m of moves){
+    const snap = snapshot(game);
+    game.move(m);
+    const s = minimax(game, config.depth-1, -Infinity, Infinity, !maximizing);
+    restore(game, snap);
+    if (maximizing ? s>bestScore : s<bestScore){ bestScore=s; bestMoves=[m]; }
+    else if (s===bestScore) bestMoves.push(m);
+  }
+  if (bestMoves.length > 1 && personality && personality !== 'balanced'){
+    let best = bestMoves[0], bestBonus = -Infinity;
+    for (const m of bestMoves){
+      const bonus = kidsPersonalityBonus(game, m, personality);
+      if (bonus > bestBonus){ bestBonus = bonus; best = m; }
+    }
+    return best;
+  }
+  return bestMoves[Math.floor(Math.random()*bestMoves.length)];
+}
+
+// Reference move used only by the coach (suggestions / move quality / goal
+// text) — a fixed, fairly strong depth-3 search, independent of how weak
+// the actual opponent is playing this game.
+// Reference search for the coach — kept shallow on purpose (depth 2) so it
+// runs fast enough to stay invisible between taps; the endgame bump only
+// kicks in once there are few enough pieces that the extra depth is cheap.
+function chooseStrongMove(game){
+  const moves = game.legalMoves(game.turn);
+  if (moves.length===0) return null;
+  const color = game.turn;
+  const maximizing = color==='w';
+  let depth = 2;
+  let pieceCount = 0;
+  for (let r=0;r<8;r++) for(let c=0;c<8;c++) if (game.board[r][c]) pieceCount++;
+  if (pieceCount <= 5) depth = 4; else if (pieceCount <= 8) depth = 3;
+  let bestMoves=[]; let bestScore = maximizing ? -Infinity : Infinity;
+  for (const m of moves){
+    const snap = snapshot(game);
+    game.move(m);
+    const s = minimax(game, depth-1, -Infinity, Infinity, !maximizing);
+    restore(game, snap);
+    if (maximizing ? s>bestScore : s<bestScore){ bestScore=s; bestMoves=[m]; }
+    else if (s===bestScore) bestMoves.push(m);
+  }
+  return bestMoves[Math.floor(Math.random()*bestMoves.length)];
+}
+</script>
+<script>
+const PIECE_CHARS = {
+  w: {k:'♔', q:'♕', r:'♖', b:'♗', n:'♘', p:'♙'},
+  b: {k:'♚', q:'♛', r:'♜', b:'♝', n:'♞', p:'♟'}
+};
+const PIECE_NAME = { p:'Bauer', n:'Springer', b:'Läufer', r:'Turm', q:'Dame', k:'König' };
+const PIECE_NAME_DAT = { p:'Bauern', n:'Springer', b:'Läufer', r:'Turm', q:'Dame', k:'König' }; // "von einem/einer ..."
+const PIECE_ARTICLE = { p:'einem', n:'einem', b:'einem', r:'einem', q:'einer', k:'einem' };
+const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+function algToRC(alg) {
+  const c = 'abcdefgh'.indexOf(alg[0]);
+  const r = 8 - parseInt(alg[1], 10);
+  return { r, c };
+}
+
+// A short guaranteed pause before any opponent move is shown, so it never
+// feels instant/jarring — makes the move easier to actually notice.
+const MIN_AI_MOVE_DELAY_MS = 700;
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+let state = {
+  playerColor: 'w',
+  game: null,
+  selected: null,
+  legalForSelected: [],
+  aiThinking: false,
+  seenTips: new Set(),
+  kidsHelp: { moves: true, threats: true, tips: true },
+  kidsDifficulty: 'adaptive', // one of KIDS_TIER_ORDER, or 'adaptive'
+  personality: 'balanced',
+  coachSuggest: false,
+  coachEvaluate: false,
+  coachGoal: false,
+  warnOnBlunder: true, // only asks to confirm before a genuinely big material loss
+  resultRecorded: false,
+  lastMove: null,
+  showMoveHistory: false,
+  _coachBaseline: null,
+  _pendingCandidate: null,
+  // the single coach line shows the highest-priority non-empty slot here
+  coachMsg: { threat: null, verdict: null, situational: null, goal: null, suggestion: null },
+  // adaptive engine
+  adaptiveLevel: 0,         // continuous 0..3 skill level — adaptive mode starts at 🐣 Sehr leicht
+  goodStreak: 0,
+  poorStreak: 0,
+  moveStreak: 0,            // consecutive-good-move counter shown to the child
+  gameMoveRecords: []       // per player move this game: {ply, san, swing, quality, boardBefore}
+};
+
+const STORAGE_KEY = 'kids_schach_save_v1';
+const SOUND_PREF_KEY = 'kids_schach_sound_v1';
+const STATS_KEY = 'kids_schach_stats_v1';
+
+let soundEnabled = true;
+try { const stored = localStorage.getItem(SOUND_PREF_KEY); if (stored !== null) soundEnabled = stored === 'true'; } catch (e) { /* ignore */ }
+
+let audioCtx = null;
+function playMoveSound(isCapture) {
+  if (!soundEnabled) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = isCapture ? 320 : 520;
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+  } catch (e) { /* audio unavailable — silently skip */ }
+}
+function vibrateShort() {
+  if (!soundEnabled) return;
+  if (navigator.vibrate) { try { navigator.vibrate(25); } catch (e) { /* ignore */ } }
+}
+function playMoveFeedback(isCapture) { playMoveSound(isCapture); vibrateShort(); }
+
+function loadStats() {
+  try { const raw = localStorage.getItem(STATS_KEY); if (raw) return JSON.parse(raw); } catch (e) { /* ignore */ }
+  return { w: 0, l: 0, d: 0 };
+}
+function saveStats(stats) { try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)); } catch (e) { /* ignore */ } }
+function recordResult(outcome) {
+  const stats = loadStats();
+  const key = outcome === 'win' ? 'w' : outcome === 'loss' ? 'l' : 'd';
+  stats[key]++;
+  saveStats(stats);
+  applyAdaptiveGameResult(outcome);
+}
+function renderStatsContent() {
+  const stats = loadStats();
+  const el = document.getElementById('statsContent');
+  if (stats.w === 0 && stats.l === 0 && stats.d === 0) {
+    el.innerHTML = `<div style="opacity:0.6;">Noch keine Partien gespielt.</div>`;
+  } else {
+    el.innerHTML = `<div>🏆 ${stats.w} Siege · 🤝 ${stats.l} Niederlagen · ⚖️ ${stats.d} Remis</div>`;
+  }
+}
+
+function isGameOverStatus(status) {
+  return status === 'checkmate' || status === 'stalemate' || status === 'draw-fifty' || status === 'draw-repetition';
+}
+
+function showResultModal(status) {
+  const g = state.game;
+  const overlay = document.getElementById('resultOverlay');
+  const emojiEl = document.getElementById('resultEmoji');
+  const textEl = document.getElementById('resultText');
+
+  if (status === 'checkmate') {
+    const winnerColor = g.turn === 'w' ? 'b' : 'w';
+    const playerWon = winnerColor === state.playerColor;
+    emojiEl.textContent = playerWon ? '🏆' : '🤝';
+    textEl.textContent = playerWon ? 'Schachmatt — du hast gewonnen!' : 'Schachmatt — diesmal gewinnt der Fuchs.';
+    recordResult(playerWon ? 'win' : 'loss');
+  } else if (status === 'stalemate') {
+    emojiEl.textContent = '⚖️';
+    textEl.textContent = 'Patt — Remis (Unentschieden).';
+    recordResult('draw');
+  } else if (status === 'draw-fifty') {
+    emojiEl.textContent = '⚖️';
+    textEl.textContent = 'Remis — 50 Züge ohne Bauernzug oder Schlagfall.';
+    recordResult('draw');
+  } else if (status === 'draw-repetition') {
+    emojiEl.textContent = '⚖️';
+    textEl.textContent = 'Remis — dieselbe Stellung ist zum dritten Mal aufgetreten.';
+    recordResult('draw');
+  } else {
+    return;
+  }
+  document.getElementById('resultReviewBtn').style.display = state.gameMoveRecords.length ? 'block' : 'none';
+  overlay.classList.add('show');
+}
+
+function checkGameEndModal() {
+  if (state.resultRecorded) return;
+  const status = state.game.gameStatus();
+  if (isGameOverStatus(status)) {
+    state.resultRecorded = true;
+    showResultModal(status);
+  }
+}
+
+/* ==================== Adaptive engine ==================== */
+function currentKidsConfig(){
+  if (state.kidsDifficulty === 'adaptive') return configFromLevel(state.adaptiveLevel);
+  return KIDS_TIER_CONFIGS[state.kidsDifficulty] || KIDS_TIER_CONFIGS.verylight;
+}
+function currentTierLabel(){
+  const level = state.kidsDifficulty === 'adaptive' ? state.adaptiveLevel : KIDS_TIER_ORDER.indexOf(state.kidsDifficulty);
+  const idx = tierIndexFromLevel(level);
+  return KIDS_TIER_EMOJI[KIDS_TIER_ORDER[idx]] + ' ' + KIDS_TIER_LABEL[KIDS_TIER_ORDER[idx]];
+}
+function renderAdaptiveStatus(){
+  const el = document.getElementById('adaptiveStatus');
+  if (state.kidsDifficulty !== 'adaptive') { el.textContent = ''; return; }
+  el.textContent = 'Fuchs-Niveau gerade: ' + currentTierLabel();
+}
+function showLevelToast(text){
+  const el = document.getElementById('levelToast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(showLevelToast._t);
+  showLevelToast._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function showStreakToast(text){
+  const el = document.getElementById('streakToast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(showStreakToast._t);
+  showStreakToast._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+// Live, within-game adjustment: requires a short streak of clearly good or
+// clearly poor moves (not a single blunder or lucky shot) before nudging
+// the level, so a single mistake never suddenly makes the game harder.
+function applyAdaptiveMoveResult(swing){
+  state.moveStreak = swing >= -80 ? state.moveStreak + 1 : 0;
+  if (state.moveStreak > 0 && state.moveStreak % 3 === 0) {
+    showStreakToast('🔥 ' + state.moveStreak + ' clevere Züge in Folge!');
+  }
+  if (state.kidsDifficulty !== 'adaptive') return;
+  const beforeIdx = tierIndexFromLevel(state.adaptiveLevel);
+  if (swing >= -80) {
+    state.goodStreak++; state.poorStreak = 0;
+    if (state.goodStreak >= 3) {
+      state.adaptiveLevel = Math.min(3, state.adaptiveLevel + 0.4);
+      state.goodStreak = 0;
+    }
+  } else if (swing <= -200) {
+    state.poorStreak++; state.goodStreak = 0;
+    if (state.poorStreak >= 3) {
+      state.adaptiveLevel = Math.max(0, state.adaptiveLevel - 0.5);
+      state.poorStreak = 0;
+    }
+  } else {
+    state.goodStreak = 0; state.poorStreak = 0;
+  }
+  const afterIdx = tierIndexFromLevel(state.adaptiveLevel);
+  if (afterIdx !== beforeIdx) {
+    const dir = afterIdx > beforeIdx ? 'wird kniffliger!' : 'wird entspannter!';
+    showLevelToast(KIDS_TIER_EMOJI[KIDS_TIER_ORDER[beforeIdx]] + '→' + KIDS_TIER_EMOJI[KIDS_TIER_ORDER[afterIdx]] + ' Der Fuchs ' + dir);
+  }
+  renderAdaptiveStatus();
+}
+// Between-game calibration: the starting level for the next game shifts a
+// little based on how the last one went, on top of any live adjustment.
+function applyAdaptiveGameResult(outcome){
+  if (state.kidsDifficulty !== 'adaptive') return;
+  const beforeIdx = tierIndexFromLevel(state.adaptiveLevel);
+  if (outcome === 'win') state.adaptiveLevel = Math.min(3, state.adaptiveLevel + 0.3);
+  else if (outcome === 'loss') state.adaptiveLevel = Math.max(0, state.adaptiveLevel - 0.2);
+  const afterIdx = tierIndexFromLevel(state.adaptiveLevel);
+  if (afterIdx !== beforeIdx) {
+    const dir = afterIdx > beforeIdx ? 'wird kniffliger!' : 'wird entspannter!';
+    showLevelToast(KIDS_TIER_EMOJI[KIDS_TIER_ORDER[beforeIdx]] + '→' + KIDS_TIER_EMOJI[KIDS_TIER_ORDER[afterIdx]] + ' Der Fuchs ' + dir);
+  }
+  renderAdaptiveStatus();
+}
+function resetAdaptiveLevel(){
+  state.adaptiveLevel = 0;
+  state.goodStreak = 0; state.poorStreak = 0; state.moveStreak = 0;
+  renderAdaptiveStatus();
+  showLevelToast('🔄 Niveau zurückgesetzt: ' + currentTierLabel());
+  saveGame();
+}
+
+/* ==================== Coach: suggestions, move quality, goals ==================== */
+function explainMove(game, move) {
+  const reasons = [];
+  const piece = game.board[move.from.r][move.from.c];
+  if (!piece) return 'Das ist ein kluger Zug!';
+
+  const snap = snapshot(game);
+  game.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo || 'q' });
+  const givesCheck = game.inCheck(game.turn);
+  restore(game, snap);
+
+  if (move.promotion) reasons.push('verwandelt deinen Bauern in eine starke Figur! 👑');
+  if (move.capture) reasons.push('schnappt sich eine Figur vom Gegner! 😊');
+  if (givesCheck) reasons.push('bedroht den König des Gegners!');
+  if (move.castle) reasons.push('bringt deinen König in ein sicheres Schloss! 🏰');
+  const homeRow = piece.color === 'w' ? 7 : 0;
+  const isDeveloping = (piece.type === 'n' || piece.type === 'b') && move.from.r === homeRow;
+  if (isDeveloping) reasons.push('weckt eine schlafende Figur auf');
+  const centerFiles = [2, 3, 4, 5];
+  const centerRanks = [3, 4, 5, 6];
+  if (centerFiles.includes(move.to.c) && centerRanks.includes(move.to.r) && !isDeveloping) {
+    reasons.push('erobert die Mitte des Spielfelds');
+  }
+  if (!reasons.length) reasons.push('ist ein kluger Zug');
+  return reasons.length > 1
+    ? 'Dieser Zug ' + reasons.slice(0, -1).join(', ') + ' und ' + reasons[reasons.length - 1] + '.'
+    : 'Dieser Zug ' + reasons[0] + '.';
+}
+
+// Reference analysis for whoever is to move: the coach's own suggested move
+// plus a score from the mover's perspective (positive = good for the mover).
+function getCoachAnalysis(game) {
+  const move = chooseStrongMove(game);
+  if (!move) return null;
+  const snap = snapshot(game);
+  const moverColor = game.turn;
+  game.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo || 'q' });
+  const raw = evaluate(game);
+  restore(game, snap);
+  const score = moverColor === 'w' ? raw : -raw;
+  return { move, score };
+}
+function coachMoveLabel(game, move) {
+  return sqName(move.from.r, move.from.c) + '–' + sqName(move.to.r, move.to.c);
+}
+
+function suggestGoal(game) {
+  const color = state.playerColor;
+  const opponent = color === 'w' ? 'b' : 'w';
+  const homeRow = color === 'w' ? 7 : 0;
+  const moveCount = game.history.length;
+  const canCastle = color === 'w' ? (game.castling.wK || game.castling.wQ) : (game.castling.bK || game.castling.bQ);
+  const kingHome = game.board[homeRow][4] && game.board[homeRow][4].type === 'k';
+
+  if (moveCount < 24 && canCastle && kingHome) {
+    return '🏰 Ziel: Bring deinen König mit der Rochade in Sicherheit!';
+  }
+  let undeveloped = 0;
+  for (let c of [1,2,5,6]) { const p = game.board[homeRow][c]; if (p && (p.type==='n'||p.type==='b')) undeveloped++; }
+  if (moveCount < 20 && undeveloped >= 2) {
+    return '🐴 Ziel: Wecke deine Springer und Läufer auf — bring sie ins Spiel!';
+  }
+  const centerFiles=[3,4], centerRanks = color==='w' ? [3,4] : [3,4];
+  let centerPawn = false;
+  for (const cf of centerFiles) for (const cr of centerRanks) { const p = game.board[cr][cf]; if (p && p.color===color && p.type==='p') centerPawn = true; }
+  if (moveCount < 16 && !centerPawn) {
+    return '🎯 Ziel: Erobere mit einem Bauern die Mitte des Spielfelds!';
+  }
+  let myVal = 0, oppVal = 0;
+  for (let r=0;r<8;r++) for (let c=0;c<8;c++){ const p = game.board[r][c]; if (!p) continue; const v = PIECE_VALUES[p.type]; if (p.color===color) myVal+=v; else oppVal+=v; }
+  if (myVal - oppVal >= 3) {
+    return '⚔️ Ziel: Du bist im Vorteil — greif mutig an!';
+  }
+  if (oppVal - myVal >= 3) {
+    return '🛡️ Ziel: Pass gut auf deine Figuren auf und suche nach Chancen zum Zurückschlagen!';
+  }
+  return '👀 Ziel: Schau genau hin — steht jede deiner Figuren sicher?';
+}
+
+async function refreshCoachForPlayerTurn() {
+  const g = state.game;
+  // A fresh turn clears the last move's verdict — goal/suggestion take
+  // over as the ambient guidance. Situational reactions (check, capture,
+  // welcome) are left alone here so they stay readable until the player
+  // actually acts again, instead of vanishing the instant it's their turn.
+  setCoachSlot('verdict', null);
+  if (g.turn !== state.playerColor || isGameOverStatus(g.gameStatus())) {
+    setCoachSlot('goal', null);
+    setCoachSlot('suggestion', null);
+    state._coachBaseline = null;
+    return;
+  }
+  setCoachSlot('goal', state.coachGoal ? { text: suggestGoal(g), tone: 'hint' } : null);
+  // Baseline is computed whenever it's the player's turn — needed for move
+  // quality tracking, streaks, and the adaptive engine, not only when the
+  // "Zauber-Tipp" toggle is switched on.
+  const analysis = getCoachAnalysis(g);
+  if (!analysis || state.game !== g || g.turn !== state.playerColor) return;
+  state._coachBaseline = analysis;
+  // Snapshot of the position right before the player moves — needed if this
+  // move turns out to be a mistake worth saving for the Fehler-Trainer.
+  state._coachBaselineBoard = cloneBoard(g.board);
+  state._coachBaselineTurn = g.turn;
+  if (state.coachSuggest) {
+    const label = coachMoveLabel(g, analysis.move);
+    setCoachSlot('suggestion', { text: '🧙‍♂️ Zauber-Tipp: ' + label + ' — ' + explainMove(g, analysis.move), tone: 'tip' });
+  } else {
+    setCoachSlot('suggestion', null);
+  }
+}
+
+function classifyCoachSwing(swing) {
+  if (swing >= -20) return { emoji: '🌟', text: 'Wow, das war ein Super-Zug!' };
+  if (swing >= -80) return { emoji: '😄', text: 'Klasse gemacht!' };
+  if (swing >= -200) return { emoji: '🙂', text: 'Gut! Es ging noch ein kleines bisschen besser.' };
+  if (swing >= -450) return { emoji: '🤔', text: 'Fast! Es gab einen noch besseren Zug.' };
+  return { emoji: '💪', text: 'Kein Problem — das war nicht der beste Zug. Weiter geht\'s!' };
+}
+
+/* ==================== Fehler-Trainer ====================
+   Positions where the child made a clearly avoidable mistake are saved and
+   later resurface as small "find the better move" puzzles, on a light
+   spaced-repetition schedule — solve one and it comes back further out
+   each time, get it wrong and it comes back sooner. */
+const MISTAKE_STORAGE_KEY = 'kids_schach_mistakes_v1';
+const MISTAKE_SWING_THRESHOLD = -200; // capture anything rated 🤔 or worse
+const MISTAKE_MAX_STORED = 40;
+const MISTAKE_SUCCESS_INTERVALS_HOURS = [24, 72, 168, 384]; // 1, 3, 7, 16 days
+const MISTAKE_RETRY_DELAY_HOURS = 3;
+
+function boardToPieces(board) {
+  const pieces = [];
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+    const p = board[r][c];
+    if (p) pieces.push({ square: sqName(r, c), type: p.type, color: p.color });
+  }
+  return pieces;
+}
+function loadMistakes() {
+  try { const raw = localStorage.getItem(MISTAKE_STORAGE_KEY); if (raw) return JSON.parse(raw); } catch (e) { /* ignore */ }
+  return [];
+}
+function saveMistakes(list) { try { localStorage.setItem(MISTAKE_STORAGE_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ } }
+function dueMistakeCount() {
+  const now = Date.now();
+  return loadMistakes().filter(m => m.nextReviewAt <= now).length;
+}
+function addMistake(boardBefore, turn, playedSan, swing, playedFrom, playedTo) {
+  const list = loadMistakes();
+  list.push({
+    id: 'm' + Date.now() + Math.random().toString(36).slice(2, 7),
+    pieces: boardToPieces(boardBefore),
+    turn,
+    playedSan,
+    playedFrom: playedFrom ? sqName(playedFrom.r, playedFrom.c) : null,
+    playedTo: playedTo ? sqName(playedTo.r, playedTo.c) : null,
+    swing,
+    createdAt: Date.now(),
+    nextReviewAt: Date.now(),
+    stage: -1
+  });
+  while (list.length > MISTAKE_MAX_STORED) list.shift();
+  saveMistakes(list);
+  updateMistakeBadge();
+}
+function updateMistakeStageAfterAttempt(id, success) {
+  const list = loadMistakes();
+  const idx = list.findIndex(m => m.id === id);
+  if (idx === -1) return;
+  if (success) {
+    const rec = list[idx];
+    rec.stage = (rec.stage ?? -1) + 1;
+    if (rec.stage >= MISTAKE_SUCCESS_INTERVALS_HOURS.length) {
+      list.splice(idx, 1); // graduated — mastered, remove from rotation
+    } else {
+      rec.nextReviewAt = Date.now() + MISTAKE_SUCCESS_INTERVALS_HOURS[rec.stage] * 3600 * 1000;
+    }
+  } else {
+    list[idx].stage = -1;
+    list[idx].nextReviewAt = Date.now() + MISTAKE_RETRY_DELAY_HOURS * 3600 * 1000;
+  }
+  saveMistakes(list);
+  updateMistakeBadge();
+}
+function updateMistakeBadge() {
+  const badge = document.getElementById('mistakeBadge');
+  const count = dueMistakeCount();
+  if (count > 0) { badge.textContent = count > 9 ? '9+' : String(count); badge.classList.add('show'); }
+  else badge.classList.remove('show');
+}
+
+// Runs after every player move (regardless of which coach toggles are on)
+// so the streak counter, the adaptive engine, and the post-game review all
+// have real data to work with. Pass a precomputedSwing when it was already
+// worked out for the blunder check, so the (fairly expensive) analysis
+// doesn't run twice for the same move.
+function recordPlayerMoveQuality(baseline, san, precomputedSwing, boardBeforeMove, turnBeforeMove, playedFrom, playedTo) {
+  if (!baseline) return;
+  let swing = precomputedSwing;
+  if (swing === undefined) {
+    const afterAnalysis = getCoachAnalysis(state.game); // side to move now is the opponent
+    const afterScoreForMover = afterAnalysis ? -afterAnalysis.score : 0;
+    swing = afterScoreForMover - baseline.score;
+  }
+  const verdict = classifyCoachSwing(swing);
+
+  state.gameMoveRecords.push({ san, swing, emoji: verdict.emoji, text: verdict.text, boardBefore: null });
+  if (swing <= MISTAKE_SWING_THRESHOLD && boardBeforeMove) {
+    addMistake(boardBeforeMove, turnBeforeMove, san, swing, playedFrom, playedTo);
+  }
+
+  setCoachSlot('verdict', state.coachEvaluate ? { text: verdict.emoji + ' ' + verdict.text, tone: swing >= -80 ? 'good' : 'hint' } : null);
+  applyAdaptiveMoveResult(swing);
+}
+
+/* ==================== Threat radar ====================
+   Only flags pieces that are genuinely hanging (attacked and NOT defended
+   by another own piece) — a piece that's merely attacked but well guarded
+   is completely normal in chess and would otherwise fire constantly,
+   crowding out every other coach message. */
+function findThreats(g, color) {
+  const opponent = color === 'w' ? 'b' : 'w';
+  const threats = [];
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+    const p = g.board[r][c];
+    if (!(p && p.color === color && g.isSquareAttacked(r, c, opponent))) continue;
+    if (g.isSquareAttacked(r, c, color)) continue; // defended — not hanging
+    let attackerType = null;
+    outer:
+    for (let ar = 0; ar < 8; ar++) for (let ac = 0; ac < 8; ac++) {
+      const ap = g.board[ar][ac];
+      if (ap && ap.color === opponent) {
+        const moves = g.pseudoMoves(ar, ac);
+        if (moves.some(m => m.to.r === r && m.to.c === c)) { attackerType = ap.type; break outer; }
+      }
+    }
+    threats.push({ r, c, piece: p.type, attacker: attackerType });
+  }
+  return threats;
+}
+function computeThreatsForBoard(g) {
+  if (!(state.kidsHelp.threats && g.turn === state.playerColor)) { setCoachSlot('threat', null); return []; }
+  const threats = findThreats(g, state.playerColor);
+  if (!threats.length) { setCoachSlot('threat', null); return threats; }
+  const t = threats[0];
+  const pieceName = PIECE_NAME[t.piece];
+  const sq = sqName(t.r, t.c);
+  let msg = '⚠️ Dein ' + pieceName + ' auf ' + sq;
+  msg += t.attacker ? (' wird von ' + PIECE_ARTICLE[t.attacker] + ' ' + PIECE_NAME_DAT[t.attacker] + ' bedroht!') : ' wird bedroht!';
+  if (threats.length > 1) msg += ' (und ' + (threats.length - 1) + ' weitere)';
+  setCoachSlot('threat', { text: msg, tone: 'threat' });
+  return threats;
+}
+
+/* ==================== Single coach line ====================
+   Everything the coach wants to say funnels through one visible line,
+   picked by priority so the board stays the visual focus. */
+const COACH_PRIORITY = ['threat', 'verdict', 'situational', 'goal', 'suggestion'];
+function setCoachSlot(key, value) {
+  state.coachMsg[key] = value;
+  renderCoachLine();
+}
+function renderCoachLine() {
+  const box = document.getElementById('coachLine');
+  for (const key of COACH_PRIORITY) {
+    const entry = state.coachMsg[key];
+    if (entry) {
+      box.className = 'coach-line show tone-' + entry.tone;
+      box.textContent = entry.text;
+      return;
+    }
+  }
+  box.classList.remove('show');
+}
+
+/* ==================== Game flow ==================== */
+function getAIMove(game) {
+  return chooseKidsMove(game, currentKidsConfig(), state.personality);
+}
+
+function newGame() {
+  state.selected = null;
+  state.legalForSelected = [];
+  state.aiThinking = false;
+  state.resultRecorded = false;
+  state.lastMove = null;
+  state._coachBaseline = null;
+  state._pendingCandidate = null;
+  state._pendingSwing = undefined;
+  state.gameMoveRecords = [];
+  state.goodStreak = 0; state.poorStreak = 0; state.moveStreak = 0;
+  state.seenTips = new Set(); // fresh reactions each game, instead of a lifetime one-shot
+  state.coachMsg = { threat: null, verdict: null, situational: null, goal: null, suggestion: null };
+  renderCoachLine();
+  document.getElementById('warumBar').classList.remove('show');
+  document.getElementById('resultOverlay').classList.remove('show');
+  state.game = new ChessGame({ chess960: false });
+  render();
+  showWelcomeTipIfNeeded();
+  renderAdaptiveStatus();
+  if (state.playerColor === 'b') {
+    state.aiThinking = true;
+    renderStatus();
+    (async () => {
+      const [aiMove] = await Promise.all([Promise.resolve(getAIMove(state.game)), delay(MIN_AI_MOVE_DELAY_MS)]);
+      if (aiMove) {
+        state.game.move({ from: aiMove.from, to: aiMove.to, castle: aiMove.castle, promoteTo: aiMove.promoteTo || 'q' });
+        state.lastMove = { from: aiMove.from, to: aiMove.to };
+        playMoveFeedback(!!aiMove.capture);
+      }
+      state.aiThinking = false;
+      render();
+      checkSituationTips();
+      checkGameEndModal();
+      saveGame();
+      refreshCoachForPlayerTurn();
+    })();
+  } else {
+    refreshCoachForPlayerTurn();
+  }
+  saveGame();
+}
+
+function pieceSpan(p) {
+  const span = document.createElement('span');
+  span.className = 'piece piece-' + p.color;
+  span.textContent = PIECE_CHARS[p.color][p.type];
+  return span;
+}
+function boardCoords() {
+  const order = state.playerColor === 'b' ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7];
+  return { rows: order, cols: order };
+}
+
+function render() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  const g = state.game;
+
+  const showMoveHints = state.kidsHelp.moves;
+  const targetSet = showMoveHints ? new Set(state.legalForSelected.map(m => m.to.r + '-' + m.to.c)) : new Set();
+  const targetMoveByKey = {};
+  if (showMoveHints) state.legalForSelected.forEach(m => targetMoveByKey[m.to.r + '-' + m.to.c] = m);
+
+  const threats = computeThreatsForBoard(g);
+  const threatened = new Set(threats.map(t => t.r + '-' + t.c));
+
+  let kingInCheck = null;
+  if (g.inCheck(g.turn)) kingInCheck = g.findKingOn(g.board, g.turn);
+
+  const { rows, cols } = boardCoords();
+  rows.forEach((r, rowIdx) => {
+    cols.forEach((c, colIdx) => {
+      const sqEl = document.createElement('div');
+      sqEl.className = 'sq';
+      sqEl.dataset.r = r; sqEl.dataset.c = c;
+      const p = g.board[r][c];
+      if (p) sqEl.appendChild(pieceSpan(p));
+
+      if (state.selected && state.selected.r === r && state.selected.c === c) sqEl.classList.add('selected');
+      if (state.lastMove && ((state.lastMove.from.r === r && state.lastMove.from.c === c) || (state.lastMove.to.r === r && state.lastMove.to.c === c))) {
+        sqEl.classList.add('last-move');
+      }
+      if (kingInCheck && kingInCheck.r === r && kingInCheck.c === c) sqEl.classList.add('in-check');
+      const key = r + '-' + c;
+      if (targetSet.has(key)) {
+        const hint = document.createElement('div');
+        hint.className = 'hint' + (targetMoveByKey[key].capture ? ' capture' : '');
+        sqEl.appendChild(hint);
+      }
+      if (threatened.has(key)) sqEl.classList.add('threatened');
+
+      if (colIdx === 0) {
+        const rankLabel = document.createElement('span');
+        rankLabel.className = 'coord-label rank';
+        rankLabel.textContent = 8 - r;
+        sqEl.appendChild(rankLabel);
+      }
+      if (rowIdx === rows.length - 1) {
+        const fileLabel = document.createElement('span');
+        fileLabel.className = 'coord-label file';
+        fileLabel.textContent = 'abcdefgh'[c];
+        sqEl.appendChild(fileLabel);
+      }
+
+      sqEl.addEventListener('click', () => onSquareClick(r, c));
+      boardEl.appendChild(sqEl);
+    });
+  });
+
+  renderCaptured();
+  renderStatus();
+  if (state.showMoveHistory) renderMoveHistory();
+}
+
+function renderCaptured() {
+  const g = state.game;
+  const whiteCaptured = g.captured.b;
+  const blackCaptured = g.captured.w;
+  const whiteValue = whiteCaptured.reduce((sum, t) => sum + PIECE_VALUES[t], 0);
+  const blackValue = blackCaptured.reduce((sum, t) => sum + PIECE_VALUES[t], 0);
+  const diff = whiteValue - blackValue;
+  document.getElementById('capturedByWhite').textContent = whiteCaptured.map(t => PIECE_CHARS.b[t]).join(' ') + (diff > 0 ? ' +' + diff : '');
+  document.getElementById('capturedByBlack').textContent = blackCaptured.map(t => PIECE_CHARS.w[t]).join(' ') + (diff < 0 ? ' +' + (-diff) : '');
+}
+
+function renderStatus() {
+  const g = state.game;
+  const bar = document.getElementById('statusBar');
+  if (state.aiThinking) { bar.textContent = '🦊 Der Fuchs überlegt …'; return; }
+  const status = g.gameStatus();
+  const turnName = g.turn === 'w' ? 'Weiß' : 'Schwarz';
+  if (status === 'checkmate') { const winner = g.turn === 'w' ? 'Schwarz' : 'Weiß'; bar.textContent = 'Schachmatt — ' + winner + ' gewinnt!'; }
+  else if (status === 'stalemate') bar.textContent = 'Patt — Remis.';
+  else if (status === 'draw-fifty') bar.textContent = 'Remis — 50-Züge-Regel.';
+  else if (status === 'draw-repetition') bar.textContent = 'Remis — Stellungswiederholung.';
+  else if (status === 'check') bar.textContent = turnName + ' steht im Schach.';
+  else bar.textContent = turnName + ' ist am Zug.';
+}
+
+function renderMoveHistory() {
+  const el = document.getElementById('moveHistoryPanel');
+  const hist = state.game.history;
+  let html = '';
+  for (let i = 0; i < hist.length; i += 2) {
+    const num = Math.floor(i / 2) + 1;
+    const m1 = hist[i] ? hist[i].san : '';
+    const m2 = hist[i + 1] ? hist[i + 1].san : '';
+    html += `<div class="hist-row"><span class="hist-num">${num}.</span><span class="hist-move">${m1}</span><span class="hist-move">${m2}</span></div>`;
+  }
+  el.innerHTML = html || '<div class="hist-empty">Noch keine Züge.</div>';
+  el.scrollTop = el.scrollHeight;
+}
+
+function onSquareClick(r, c) {
+  if (state.aiThinking) return;
+  const g = state.game;
+  if (g.turn !== state.playerColor) return;
+  if (isGameOverStatus(g.gameStatus())) return;
+  if (document.getElementById('warumBar').classList.contains('show')) return; // resolve the pending prompt first
+
+  const p = g.board[r][c];
+
+  if (state.selected) {
+    const match = state.legalForSelected.find(m => m.to.r === r && m.to.c === c);
+    if (match) { handleMoveSelection(match); return; }
+  }
+
+  if (p && p.color === state.playerColor) {
+    state.selected = { r, c };
+    state.legalForSelected = g.legalMoves(state.playerColor).filter(m => m.from.r === r && m.from.c === c);
+    if (state.kidsHelp.tips) showSelectionTip(p, state.legalForSelected);
+    render();
+  } else {
+    state.selected = null;
+    state.legalForSelected = [];
+    render();
+  }
+}
+
+// Only genuinely large material blunders (losing a queen/rook for nothing,
+// roughly) interrupt the flow with a confirmation — small inaccuracies are
+// just played out and picked up afterwards by the move-quality feedback,
+// so the game doesn't stop-and-ask on every move.
+const BLUNDER_SWING_THRESHOLD = -450;
+
+// Generic version: how much does `move` change the mover's score relative
+// to `baselineScore`, on any ChessGame instance (used for the live game's
+// blunder check and for evaluating guesses in the Fehler-Trainer).
+function evaluateMoveSwing(game, baselineScore, move) {
+  const snap = snapshot(game);
+  game.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo || 'q' });
+  const afterAnalysis = getCoachAnalysis(game);
+  const afterScoreForMover = afterAnalysis ? -afterAnalysis.score : 0;
+  const swing = afterScoreForMover - baselineScore;
+  restore(game, snap);
+  return swing;
+}
+function evaluateCandidateSwing(move) {
+  const baseline = state._coachBaseline;
+  if (!baseline) return 0;
+  return evaluateMoveSwing(state.game, baseline.score, move);
+}
+
+function handleMoveSelection(move) {
+  if (move.promotion) { openPromotionModal(move); return; }
+  if (state.warnOnBlunder && state._coachBaseline) {
+    const swing = evaluateCandidateSwing(move);
+    if (swing <= BLUNDER_SWING_THRESHOLD) { showWarumNichtPrompt(move, swing); return; }
+    commitMove(move, swing);
+    return;
+  }
+  commitMove(move);
+}
+
+/* ---- Blunder check — preview feedback before a clearly bad move is committed ---- */
+function showWarumNichtPrompt(move, swing) {
+  const baseline = state._coachBaseline;
+  const label = coachMoveLabel(state.game, baseline.move);
+  document.getElementById('warumText').textContent = '🤔 Das könnte eine wertvolle Figur kosten! Der Zauber-Tipp wäre ' + label + ' gewesen. Trotzdem ziehen?';
+  document.getElementById('warumBar').classList.add('show');
+  state._pendingCandidate = move;
+  state._pendingSwing = swing;
+  state.selected = null;
+  render();
+  document.getElementById('warumBar').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function commitMove(move, precomputedSwing) {
+  const g = state.game;
+  const playedFrom = move.from, playedTo = move.to;
+  const wasCapture = !!move.capture;
+  const coachBaseline = state._coachBaseline;
+  const boardBeforeMove = state._coachBaselineBoard;
+  const turnBeforeMove = state._coachBaselineTurn;
+  const found = g.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo });
+  const san = found ? found.san : '';
+  state.lastMove = { from: playedFrom, to: playedTo };
+  playMoveFeedback(wasCapture);
+  state.selected = null;
+  state.legalForSelected = [];
+  setCoachSlot('suggestion', null);
+  setCoachSlot('goal', null);
+  setCoachSlot('situational', null); // retire the reaction to whatever happened last turn
+  document.getElementById('warumBar').classList.remove('show');
+  state._coachBaseline = null;
+  state._coachBaselineBoard = null;
+  state._coachBaselineTurn = null;
+  state._pendingCandidate = null;
+  state._pendingSwing = undefined;
+
+  render();
+  checkSituationTips();
+  recordPlayerMoveQuality(coachBaseline, san, precomputedSwing, boardBeforeMove, turnBeforeMove, playedFrom, playedTo);
+
+  const status = g.gameStatus();
+  if (isGameOverStatus(status)) { checkGameEndModal(); saveGame(); return; }
+
+  state.aiThinking = true;
+  renderStatus();
+  saveGame();
+  (async () => {
+    const [aiMove] = await Promise.all([Promise.resolve(getAIMove(g)), delay(MIN_AI_MOVE_DELAY_MS)]);
+    if (aiMove) {
+      g.move({ from: aiMove.from, to: aiMove.to, castle: aiMove.castle, promoteTo: aiMove.promoteTo || 'q' });
+      state.lastMove = { from: aiMove.from, to: aiMove.to };
+      playMoveFeedback(!!aiMove.capture);
+    }
+    state.aiThinking = false;
+    render();
+    checkSituationTips();
+    checkGameEndModal();
+    saveGame();
+    refreshCoachForPlayerTurn();
+  })();
+}
+
+function openPromotionModal(move) {
+  const overlay = document.getElementById('promoOverlay');
+  const row = document.getElementById('promoRow');
+  row.innerHTML = '';
+  ['q','r','b','n'].forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'promo-btn';
+    btn.textContent = PIECE_CHARS[state.playerColor][opt];
+    btn.addEventListener('click', () => {
+      overlay.classList.remove('show');
+      const withPromo = { ...move, promoteTo: opt };
+      if (state.warnOnBlunder && state._coachBaseline) {
+        const swing = evaluateCandidateSwing(withPromo);
+        if (swing <= BLUNDER_SWING_THRESHOLD) { showWarumNichtPrompt(withPromo, swing); return; }
+        commitMove(withPromo, swing);
+        return;
+      }
+      commitMove(withPromo);
+    });
+    row.appendChild(btn);
+  });
+  overlay.classList.add('show');
+}
+
+// Only the less-obvious special rules get a one-time explanation — how each
+// piece moves is assumed to be known already.
+function showSelectionTip(piece, moves) {
+  if (!state.kidsHelp.tips) return;
+  const castleMove = moves.find(m => m.castle);
+  const epMove = moves.find(m => m.enpassant);
+  const promoMove = moves.find(m => m.promotion);
+
+  let msg = null;
+  if (castleMove && !state.seenTips.has('castle')) { msg = '👑 Rochade! König und Turm dürfen hier gemeinsam ziehen — dein König wird sicherer.'; state.seenTips.add('castle'); }
+  else if (epMove && !state.seenTips.has('ep')) { msg = '✨ En passant! Dein Bauer darf hier einen gegnerischen Bauern im Vorbeigehen schlagen.'; state.seenTips.add('ep'); }
+  else if (promoMove && !state.seenTips.has('promo')) { msg = '⭐ Fast geschafft! Wenn dein Bauer die letzte Reihe erreicht, wird er zu einer starken Figur.'; state.seenTips.add('promo'); }
+
+  // Only overwrite the coach line when there's actually a new special-move
+  // tip to show — otherwise leave whatever reactive message (check,
+  // capture, welcome) is already there so it stays readable.
+  if (msg) setCoachSlot('situational', { text: msg, tone: 'tip' });
+}
+
+function checkSituationTips() {
+  if (!state.kidsHelp.tips) return;
+  const g = state.game;
+  const status = g.gameStatus();
+  const opponentColor = state.playerColor === 'w' ? 'b' : 'w';
+  const isPlayerTurn = g.turn === state.playerColor;
+
+  const candidates = [
+    { key: 'check', cond: status === 'check', text: isPlayerTurn ? '⚡ Schach! Dein König wird angegriffen — du musst ihn jetzt beschützen.' : '🎉 Schach! Du hast den König deines Gegners angegriffen.' },
+    { key: 'capture-good', cond: g.captured[opponentColor].length > 0, text: '🎉 Du hast eine gegnerische Figur geschlagen! Stark gemacht.' },
+    { key: 'capture-lost', cond: g.captured[state.playerColor].length > 0, text: '😊 Der Fuchs hat eine deiner Figuren geschlagen. Das passiert jedem — einfach weiterspielen!' }
+  ];
+  for (const c of candidates) {
+    if (c.cond && !state.seenTips.has(c.key)) {
+      setCoachSlot('situational', { text: c.text, tone: 'tip' });
+      state.seenTips.add(c.key);
+      return;
+    }
+  }
+}
+
+function showWelcomeTipIfNeeded() {
+  if (!state.kidsHelp.tips) return;
+  if (state.game.history.length > 0) return;
+  if (state.seenTips.has('welcome')) return;
+  setCoachSlot('situational', { text: '👋 Willkommen im Schach-Abenteuer! Tippe auf eine Figur, um zu sehen, wohin sie ziehen darf.', tone: 'tip' });
+  state.seenTips.add('welcome');
+}
+
+// Undoes one full pair (the child's last move and the fox's reply), not
+// the whole game — same as tapping through a couple of moves manually.
+function undoLastPair() {
+  const g = state.game;
+  if (g.history.length === 0) return;
+  const stripCount = Math.min(2, g.history.length);
+  const movesToReplay = g.history.slice(0, g.history.length - stripCount);
+  const fresh = new ChessGame({ chess960: false });
+  for (const m of movesToReplay) {
+    fresh.move({ from: m.from, to: m.to, castle: m.castle, promoteTo: m.promoteTo });
+  }
+  state.game = fresh;
+  state.selected = null;
+  state.legalForSelected = [];
+  state.resultRecorded = false;
+  state._coachBaseline = null;
+  state._pendingCandidate = null;
+  state._pendingSwing = undefined;
+  if (state.gameMoveRecords.length) state.gameMoveRecords.pop();
+  state.goodStreak = 0; state.poorStreak = 0; state.moveStreak = 0;
+  state.coachMsg = { threat: null, verdict: null, situational: null, goal: null, suggestion: null };
+  renderCoachLine();
+  document.getElementById('warumBar').classList.remove('show');
+  state.lastMove = movesToReplay.length
+    ? { from: movesToReplay[movesToReplay.length - 1].from, to: movesToReplay[movesToReplay.length - 1].to }
+    : null;
+  document.getElementById('resultOverlay').classList.remove('show');
+  render();
+  refreshCoachForPlayerTurn();
+}
+
+/* ==================== Post-game review ==================== */
+function renderReview() {
+  const content = document.getElementById('reviewContent');
+  const boardEl = document.getElementById('reviewBoard');
+  boardEl.classList.remove('show');
+  const records = state.gameMoveRecords;
+  if (!records.length) { content.innerHTML = '<div class="review-empty">Für diese Partie gibt es noch keinen Rückblick.</div>'; return; }
+
+  const sorted = [...records].sort((a, b) => b.swing - a.swing);
+  const best = sorted.slice(0, 3).filter(r => r.swing >= -80);
+  const worst = [...sorted].reverse().slice(0, 2).filter(r => r.swing < -80);
+
+  let html = '';
+  if (best.length) {
+    html += '<div class="section-label" style="text-align:left;">Deine stärksten Züge</div>';
+    best.forEach(r => { html += reviewItemHtml(r); });
+  }
+  if (worst.length) {
+    html += '<div class="section-label" style="text-align:left; margin-top:10px;">Da war noch Luft nach oben</div>';
+    worst.forEach(r => { html += reviewItemHtml(r); });
+  }
+  if (!best.length && !worst.length) {
+    html += '<div class="review-empty">Solide Partie — keine besonderen Ausreißer nach oben oder unten!</div>';
+  }
+  content.innerHTML = html;
+}
+function reviewItemHtml(r) {
+  return `<div class="review-item"><div class="ri-head"><span>${r.san}</span><span>${r.emoji}</span></div><div class="ri-text">${r.text}</div></div>`;
+}
+
+/* ---- Fehler-Trainer: puzzle presentation & interaction ---- */
+let trainerState = { queue: [], index: 0, game: null, selected: null, legalForSelected: [], answered: false };
+
+function openTrainer() {
+  const now = Date.now();
+  trainerState.queue = loadMistakes().filter(m => m.nextReviewAt <= now).sort((a, b) => a.nextReviewAt - b.nextReviewAt);
+  trainerState.index = 0;
+  document.getElementById('trainerOverlay').classList.add('show');
+  loadTrainerPuzzle();
+}
+function closeTrainer() {
+  document.getElementById('trainerOverlay').classList.remove('show');
+  updateMistakeBadge();
+}
+function loadTrainerPuzzle() {
+  const feedback = document.getElementById('trainerFeedback');
+  const nextBtn = document.getElementById('trainerNextBtn');
+  const boardEl = document.getElementById('trainerBoard');
+  const promptEl = document.getElementById('trainerPrompt');
+  const contextEl = document.getElementById('trainerContext');
+  const turnLabelEl = document.getElementById('trainerTurnLabel');
+  feedback.classList.remove('show');
+  nextBtn.style.display = 'none';
+  trainerState.answered = false;
+  trainerState.selected = null;
+  trainerState.legalForSelected = [];
+  trainerState.lastGuessMove = null;
+
+  if (trainerState.index >= trainerState.queue.length) {
+    boardEl.innerHTML = '';
+    const remaining = loadMistakes().length;
+    promptEl.textContent = '';
+    contextEl.classList.remove('show');
+    turnLabelEl.textContent = '';
+    boardEl.outerHTML = `<div class="trainer-empty" id="trainerBoard">🎉 Super, gerade nichts Fälliges zu üben!` +
+      (remaining > 0 ? ' Die restlichen Stellungen kommen wieder, wenn es Zeit dafür ist.' : ' Sobald mal ein Zug nicht ganz optimal war, taucht er hier später als kleines Rätsel auf.') + `</div>`;
+    return;
+  }
+  const rec = trainerState.queue[trainerState.index];
+  trainerState.game = new ChessGame({ customPieces: rec.pieces, turn: rec.turn });
+  trainerState.currentRecord = rec;
+
+  const turnLabel = rec.turn === 'w' ? 'Weiß' : 'Schwarz';
+  turnLabelEl.textContent = (rec.turn === 'w' ? '⚪' : '⚫') + ' ' + turnLabel + ' ist am Zug — das sind deine Figuren, unten im Bild.';
+  contextEl.classList.add('show');
+  contextEl.textContent = rec.playedFrom && rec.playedTo
+    ? '📍 Genau hier hast du zuletzt ' + rec.playedSan + ' gespielt (gelb markiert, ① Start, ② Ziel) — das war nicht die beste Wahl.'
+    : '📍 Genau hier hast du zuletzt ' + rec.playedSan + ' gespielt — das war nicht die beste Wahl.';
+  promptEl.textContent = '👉 Finde jetzt einen besseren Zug! Tippe deine Figur an und dann das Feld, wohin sie soll.';
+  renderTrainerBoard();
+}
+function renderTrainerBoard() {
+  let boardEl = document.getElementById('trainerBoard');
+  if (!boardEl || boardEl.classList.contains('trainer-empty')) {
+    // was replaced by the empty-state div — recreate a fresh board container
+    const holder = document.createElement('div');
+    holder.className = 'trainer-board';
+    holder.id = 'trainerBoard';
+    document.getElementById('trainerFeedback').insertAdjacentElement('beforebegin', holder);
+    boardEl = holder;
+  }
+  boardEl.innerHTML = '';
+  const g = trainerState.game;
+  const rec = trainerState.currentRecord;
+  const targetSet = new Set(trainerState.legalForSelected.map(m => m.to.r + '-' + m.to.c));
+  const targetMoveByKey = {};
+  trainerState.legalForSelected.forEach(m => targetMoveByKey[m.to.r + '-' + m.to.c] = m);
+  const playedFromRC = rec.playedFrom ? squareToRC(rec.playedFrom) : null;
+  const playedToRC = rec.playedTo ? squareToRC(rec.playedTo) : null;
+  // Once answered, the highlight switches to the child's own just-played
+  // guess instead of the stale original-mistake squares.
+  const highlightFrom = (trainerState.answered && trainerState.lastGuessMove) ? trainerState.lastGuessMove.from : playedFromRC;
+  const highlightTo = (trainerState.answered && trainerState.lastGuessMove) ? trainerState.lastGuessMove.to : playedToRC;
+
+  // Always shown from the solver's own perspective — their pieces at the
+  // bottom, matching how the main board orients play.
+  const order = rec.turn === 'b' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  for (const r of order) {
+    for (const c of order) {
+      const sqEl = document.createElement('div');
+      sqEl.className = 'sq';
+      const p = g.board[r][c];
+      if (p) sqEl.appendChild(pieceSpan(p));
+      if (trainerState.selected && trainerState.selected.r === r && trainerState.selected.c === c) sqEl.classList.add('selected');
+      if (highlightFrom && highlightFrom.r === r && highlightFrom.c === c) sqEl.classList.add('was-played', 'was-played-from');
+      if (highlightTo && highlightTo.r === r && highlightTo.c === c) sqEl.classList.add('was-played', 'was-played-to');
+      const key = r + '-' + c;
+      if (targetSet.has(key)) {
+        const hint = document.createElement('div');
+        hint.className = 'hint' + (targetMoveByKey[key].capture ? ' capture' : '');
+        sqEl.appendChild(hint);
+      }
+      if (!trainerState.answered) sqEl.addEventListener('click', () => onTrainerSquareClick(r, c));
+      boardEl.appendChild(sqEl);
+    }
+  }
+}
+function onTrainerSquareClick(r, c) {
+  if (trainerState.answered) return;
+  const g = trainerState.game;
+  const p = g.board[r][c];
+  if (trainerState.selected) {
+    const match = trainerState.legalForSelected.find(m => m.to.r === r && m.to.c === c);
+    if (match) { submitTrainerGuess(match); return; }
+  }
+  if (p && p.color === g.turn) {
+    trainerState.selected = { r, c };
+    trainerState.legalForSelected = g.legalMoves(g.turn).filter(m => m.from.r === r && m.from.c === c);
+  } else {
+    trainerState.selected = null;
+    trainerState.legalForSelected = [];
+  }
+  renderTrainerBoard();
+}
+function submitTrainerGuess(move) {
+  const g = trainerState.game;
+  const rec = trainerState.currentRecord;
+  const baseline = getCoachAnalysis(g);
+  const guessSwing = baseline ? evaluateMoveSwing(g, baseline.score, { ...move, promoteTo: move.promoteTo || 'q' }) : 0;
+  const success = guessSwing >= -80;
+  g.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo || 'q' }); // actually play it out so the board reflects the guess
+  trainerState.answered = true;
+  trainerState.lastGuessMove = move;
+  trainerState.selected = null;
+  trainerState.legalForSelected = [];
+  renderTrainerBoard();
+
+  const feedback = document.getElementById('trainerFeedback');
+  feedback.classList.add('show');
+  if (success) {
+    feedback.className = 'coach-line show tone-good';
+    feedback.textContent = '🌟 Klasse — diesmal hast du einen guten Zug gefunden, statt ' + rec.playedSan + ' wie beim letzten Mal!';
+  } else {
+    const label = baseline ? coachMoveLabel(g, baseline.move) : '';
+    feedback.className = 'coach-line show tone-hint';
+    feedback.textContent = '💡 Noch nicht ganz — ' + (label ? ('stark wäre ' + label + ' gewesen. ') : '') + 'Kein Problem, beim nächsten Mal klappt\'s bestimmt!';
+  }
+  updateMistakeStageAfterAttempt(rec.id, success);
+  document.getElementById('trainerNextBtn').style.display = 'block';
+}
+
+/* ==================== Save / load / backup ==================== */
+function saveGame() {
+  try {
+    const data = {
+      playerColor: state.playerColor,
+      kidsHelp: state.kidsHelp,
+      kidsDifficulty: state.kidsDifficulty,
+      personality: state.personality,
+      coachSuggest: state.coachSuggest,
+      coachEvaluate: state.coachEvaluate,
+      coachGoal: state.coachGoal,
+      warnOnBlunder: state.warnOnBlunder,
+      seenTips: Array.from(state.seenTips),
+      resultRecorded: state.resultRecorded,
+      adaptiveLevel: state.adaptiveLevel,
+      moves: state.game.history.map(m => ({ from: m.from, to: m.to, castle: m.castle, promoteTo: m.promoteTo }))
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) { /* storage unavailable — game still works, just won't persist */ }
+}
+
+function exportBackup() {
+  const data = { exportedAt: new Date().toISOString(), save: localStorage.getItem(STORAGE_KEY), stats: localStorage.getItem(STATS_KEY), mistakes: localStorage.getItem(MISTAKE_STORAGE_KEY) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'schach-abenteuer-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importBackupFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.save) localStorage.setItem(STORAGE_KEY, data.save);
+      if (data.stats) localStorage.setItem(STATS_KEY, data.stats);
+      if (data.mistakes) localStorage.setItem(MISTAKE_STORAGE_KEY, data.mistakes);
+      alert('Backup wiederhergestellt! Die App lädt jetzt neu.');
+      location.reload();
+    } catch (e) {
+      alert('Diese Datei konnte nicht gelesen werden — ist es wirklich ein Backup vom Schach-Abenteuer?');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function loadGame() {
+  let raw;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { raw = null; }
+  if (!raw) return false;
+  try {
+    const data = JSON.parse(raw);
+    state.playerColor = data.playerColor || 'w';
+    state.kidsHelp = data.kidsHelp || { moves: true, threats: true, tips: true };
+    state.kidsDifficulty = data.kidsDifficulty || 'adaptive';
+    state.personality = data.personality || 'balanced';
+    state.coachSuggest = data.coachSuggest || false;
+    state.coachEvaluate = data.coachEvaluate || false;
+    state.coachGoal = data.coachGoal || false;
+    state.warnOnBlunder = data.warnOnBlunder !== undefined ? data.warnOnBlunder : true;
+    state.adaptiveLevel = typeof data.adaptiveLevel === 'number' ? data.adaptiveLevel : 0;
+    state._coachBaseline = null;
+    state._pendingCandidate = null;
+    state.gameMoveRecords = [];
+    state.goodStreak = 0; state.poorStreak = 0; state.moveStreak = 0;
+    state.seenTips = new Set(data.seenTips || []);
+    state.selected = null;
+    state.legalForSelected = [];
+    state.aiThinking = false;
+
+    const fresh = new ChessGame({ chess960: false });
+    for (const m of (data.moves || [])) fresh.move({ from: m.from, to: m.to, castle: m.castle, promoteTo: m.promoteTo });
+    state.game = fresh;
+    const savedMoves = data.moves || [];
+    state.lastMove = savedMoves.length ? { from: savedMoves[savedMoves.length - 1].from, to: savedMoves[savedMoves.length - 1].to } : null;
+    state.resultRecorded = data.resultRecorded || false;
+
+    document.querySelectorAll('#colorRow .diff-btn').forEach(b => b.classList.toggle('active', b.dataset.color === state.playerColor));
+    document.querySelectorAll('#kidsHelpRow .diff-btn').forEach(b => b.classList.toggle('active', !!state.kidsHelp[b.dataset.help]));
+    document.querySelectorAll('#kidsDiffRow .diff-btn').forEach(b => b.classList.toggle('active', b.dataset.kidsdiff === state.kidsDifficulty));
+    document.querySelectorAll('#kidsPersonalityRow .diff-btn').forEach(b => b.classList.toggle('active', b.dataset.kidspersonality === state.personality));
+    document.querySelectorAll('#kidsCoachRow .diff-btn').forEach(b => {
+      const key = b.dataset.kidscoach;
+      const active = key === 'suggest' ? state.coachSuggest : key === 'evaluate' ? state.coachEvaluate : state.coachGoal;
+      b.classList.toggle('active', active);
+    });
+    document.querySelectorAll('#warnRow .diff-btn').forEach(b => b.classList.toggle('active', state.warnOnBlunder));
+    renderAdaptiveStatus();
+    render();
+    showWelcomeTipIfNeeded();
+    refreshCoachForPlayerTurn();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ==================== Event wiring ==================== */
+document.querySelectorAll('#colorRow .diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.playerColor = btn.dataset.color;
+    document.querySelectorAll('#colorRow .diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+    newGame();
+  });
+});
+document.querySelectorAll('#kidsDiffRow .diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.kidsDifficulty = btn.dataset.kidsdiff;
+    document.querySelectorAll('#kidsDiffRow .diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+    renderAdaptiveStatus();
+    saveGame();
+  });
+});
+document.querySelectorAll('#kidsPersonalityRow .diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.personality = btn.dataset.kidspersonality;
+    document.querySelectorAll('#kidsPersonalityRow .diff-btn').forEach(b => b.classList.toggle('active', b === btn));
+    saveGame();
+  });
+});
+document.querySelectorAll('#kidsHelpRow .diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.help;
+    state.kidsHelp[key] = !state.kidsHelp[key];
+    btn.classList.toggle('active', state.kidsHelp[key]);
+    render();
+    saveGame();
+  });
+});
+document.querySelectorAll('#kidsCoachRow .diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.kidscoach;
+    if (key === 'suggest') state.coachSuggest = !state.coachSuggest;
+    if (key === 'evaluate') state.coachEvaluate = !state.coachEvaluate;
+    if (key === 'goal') state.coachGoal = !state.coachGoal;
+    const active = key === 'suggest' ? state.coachSuggest : key === 'evaluate' ? state.coachEvaluate : state.coachGoal;
+    btn.classList.toggle('active', active);
+    if (!state.coachEvaluate) setCoachSlot('verdict', null);
+    refreshCoachForPlayerTurn();
+    saveGame();
+  });
+});
+document.querySelectorAll('#warnRow .diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.warnOnBlunder = !state.warnOnBlunder;
+    btn.classList.toggle('active', state.warnOnBlunder);
+    saveGame();
+  });
+});
+
+document.getElementById('newGameBtn').addEventListener('click', () => {
+  const g = state.game;
+  const midGame = g && g.history.length >= 4 && !isGameOverStatus(g.gameStatus());
+  if (midGame && !confirm('Deine laufende Partie ist noch nicht beendet. Wirklich eine neue Partie starten und die aktuelle aufgeben?')) return;
+  newGame();
+});
+document.getElementById('undoBtn').addEventListener('click', () => { undoLastPair(); saveGame(); });
+
+document.getElementById('resultNewGameBtn').addEventListener('click', () => {
+  document.getElementById('resultOverlay').classList.remove('show');
+  newGame();
+});
+document.getElementById('resultCloseBtn').addEventListener('click', () => {
+  document.getElementById('resultOverlay').classList.remove('show');
+});
+document.getElementById('resultReviewBtn').addEventListener('click', () => {
+  document.getElementById('resultOverlay').classList.remove('show');
+  renderReview();
+  document.getElementById('reviewOverlay').classList.add('show');
+});
+document.getElementById('reviewCloseBtn').addEventListener('click', () => {
+  document.getElementById('reviewOverlay').classList.remove('show');
+});
+
+document.getElementById('statsBtn').addEventListener('click', () => {
+  renderStatsContent();
+  document.getElementById('statsOverlay').classList.add('show');
+});
+document.getElementById('statsCloseBtn').addEventListener('click', () => {
+  document.getElementById('statsOverlay').classList.remove('show');
+});
+document.getElementById('statsResetBtn').addEventListener('click', () => {
+  if (confirm('Wirklich die gesamte Sieg/Niederlage-Statistik löschen? Das kann nicht rückgängig gemacht werden.')) {
+    saveStats({ w: 0, l: 0, d: 0 });
+    renderStatsContent();
+  }
+});
+
+document.getElementById('settingsOpenBtn').addEventListener('click', () => {
+  document.getElementById('settingsOverlay').classList.add('show');
+});
+document.getElementById('settingsCloseBtn').addEventListener('click', () => {
+  document.getElementById('settingsOverlay').classList.remove('show');
+});
+document.getElementById('backupExportBtn').addEventListener('click', exportBackup);
+document.getElementById('backupImportBtn').addEventListener('click', () => {
+  document.getElementById('backupFileInput').click();
+});
+document.getElementById('backupFileInput').addEventListener('change', (e) => {
+  if (e.target.files && e.target.files[0]) importBackupFile(e.target.files[0]);
+});
+document.getElementById('adaptiveResetBtn').addEventListener('click', () => {
+  if (confirm('Das adaptive Niveau des Fuchses auf den Standardwert zurücksetzen?')) {
+    resetAdaptiveLevel();
+  }
+});
+
+const soundToggleBtn = document.getElementById('soundToggleBtn');
+soundToggleBtn.textContent = soundEnabled ? '🔊' : '🔇';
+soundToggleBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  soundToggleBtn.textContent = soundEnabled ? '🔊' : '🔇';
+  try { localStorage.setItem(SOUND_PREF_KEY, String(soundEnabled)); } catch (e) { /* ignore */ }
+});
+
+document.getElementById('historyToggleBtn').addEventListener('click', () => {
+  state.showMoveHistory = !state.showMoveHistory;
+  document.getElementById('moveHistoryPanel').style.display = state.showMoveHistory ? 'block' : 'none';
+  if (state.showMoveHistory) renderMoveHistory();
+});
+
+document.getElementById('warumConfirmBtn').addEventListener('click', () => {
+  const move = state._pendingCandidate;
+  const swing = state._pendingSwing;
+  document.getElementById('warumBar').classList.remove('show');
+  if (move) commitMove(move, swing);
+});
+document.getElementById('warumCancelBtn').addEventListener('click', () => {
+  document.getElementById('warumBar').classList.remove('show');
+  state._pendingCandidate = null;
+  state.selected = null;
+  state.legalForSelected = [];
+  render();
+});
+
+document.getElementById('mistakeTrainerBtn').addEventListener('click', openTrainer);
+document.getElementById('trainerCloseBtn').addEventListener('click', closeTrainer);
+document.getElementById('trainerNextBtn').addEventListener('click', () => {
+  trainerState.index++;
+  loadTrainerPuzzle();
+});
+
+if (!loadGame()) newGame();
+updateMistakeBadge();
+
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => { /* offline caching unavailable — app still works online */ });
+    });
+  }
+</script>
+</body>
+</html>
