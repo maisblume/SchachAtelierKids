@@ -169,11 +169,15 @@ body {
 .review-empty { opacity: 0.6; font-size: 13.5px; padding: 10px 0; }
 
 /* ---- Fehler-Trainer board — an interactive mini version of the main board ---- */
+.trainer-board-wrap { position: relative; margin: 6px 0; }
 .trainer-board {
   display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
   aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; border: 3px solid #3f3038;
-  margin: 6px 0; user-select: none;
+  user-select: none;
 }
+.trainer-arrow-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.trainer-arrow-line { opacity: 0; animation: trainerArrowIn 0.35s ease forwards; }
+@keyframes trainerArrowIn { from { opacity: 0; } to { opacity: 0.9; } }
 .trainer-board .sq { display: flex; align-items: center; justify-content: center; font-size: clamp(20px, 7vw, 34px); cursor: pointer; position: relative; }
 .trainer-board .sq:nth-child(16n+1), .trainer-board .sq:nth-child(16n+3), .trainer-board .sq:nth-child(16n+5), .trainer-board .sq:nth-child(16n+7),
 .trainer-board .sq:nth-child(16n+10), .trainer-board .sq:nth-child(16n+12), .trainer-board .sq:nth-child(16n+14), .trainer-board .sq:nth-child(16n+16) { background: #ffd28a; }
@@ -284,7 +288,17 @@ body {
     <div id="trainerTurnLabel" style="font-size:13px; font-weight:800; opacity:0.7; margin-bottom:8px;"></div>
     <div id="trainerContext" class="coach-line tone-hint show" style="margin-bottom:10px;"></div>
     <div id="trainerPrompt" style="font-size:14.5px; font-weight:700; margin-bottom:10px;"></div>
-    <div class="trainer-board" id="trainerBoard"></div>
+    <div class="trainer-board-wrap" id="trainerBoardWrap">
+      <div class="trainer-board" id="trainerBoard"></div>
+      <svg class="trainer-arrow-svg" id="trainerArrowSvg" viewBox="0 0 8 8" preserveAspectRatio="none">
+        <defs>
+          <marker id="trainerArrowHead" markerWidth="3.4" markerHeight="3.4" refX="2.9" refY="1.7" orient="auto" markerUnits="strokeWidth">
+            <polygon points="0 0.2, 3.4 1.7, 0 3.2" fill="#1a9850"></polygon>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+    <div class="trainer-empty" id="trainerEmptyMsg" style="display:none;"></div>
     <div id="trainerFeedback" class="coach-line" style="margin-top:12px;"></div>
     <div class="result-actions">
       <button class="btn" id="trainerNextBtn" style="display:none;">Nächstes Rätsel</button>
@@ -1852,7 +1866,8 @@ function closeTrainer() {
 function loadTrainerPuzzle() {
   const feedback = document.getElementById('trainerFeedback');
   const nextBtn = document.getElementById('trainerNextBtn');
-  const boardEl = document.getElementById('trainerBoard');
+  const wrapEl = document.getElementById('trainerBoardWrap');
+  const emptyEl = document.getElementById('trainerEmptyMsg');
   const promptEl = document.getElementById('trainerPrompt');
   const contextEl = document.getElementById('trainerContext');
   const turnLabelEl = document.getElementById('trainerTurnLabel');
@@ -1862,17 +1877,21 @@ function loadTrainerPuzzle() {
   trainerState.selected = null;
   trainerState.legalForSelected = [];
   trainerState.lastGuessMove = null;
+  clearTrainerArrow();
 
   if (trainerState.index >= trainerState.queue.length) {
-    boardEl.innerHTML = '';
+    wrapEl.style.display = 'none';
+    emptyEl.style.display = 'block';
     const remaining = loadMistakes().length;
     promptEl.textContent = '';
     contextEl.classList.remove('show');
     turnLabelEl.textContent = '';
-    boardEl.outerHTML = `<div class="trainer-empty" id="trainerBoard">🎉 Super, gerade nichts Fälliges zu üben!` +
-      (remaining > 0 ? ' Die restlichen Stellungen kommen wieder, wenn es Zeit dafür ist.' : ' Sobald mal ein Zug nicht ganz optimal war, taucht er hier später als kleines Rätsel auf.') + `</div>`;
+    emptyEl.textContent = '🎉 Super, gerade nichts Fälliges zu üben!' +
+      (remaining > 0 ? ' Die restlichen Stellungen kommen wieder, wenn es Zeit dafür ist.' : ' Sobald mal ein Zug nicht ganz optimal war, taucht er hier später als kleines Rätsel auf.');
     return;
   }
+  wrapEl.style.display = '';
+  emptyEl.style.display = 'none';
   const rec = trainerState.queue[trainerState.index];
   trainerState.game = new ChessGame({ customPieces: rec.pieces, turn: rec.turn });
   trainerState.currentRecord = rec;
@@ -1887,15 +1906,7 @@ function loadTrainerPuzzle() {
   renderTrainerBoard();
 }
 function renderTrainerBoard() {
-  let boardEl = document.getElementById('trainerBoard');
-  if (!boardEl || boardEl.classList.contains('trainer-empty')) {
-    // was replaced by the empty-state div — recreate a fresh board container
-    const holder = document.createElement('div');
-    holder.className = 'trainer-board';
-    holder.id = 'trainerBoard';
-    document.getElementById('trainerFeedback').insertAdjacentElement('beforebegin', holder);
-    boardEl = holder;
-  }
+  const boardEl = document.getElementById('trainerBoard');
   boardEl.innerHTML = '';
   const g = trainerState.game;
   const rec = trainerState.currentRecord;
@@ -1949,6 +1960,56 @@ function onTrainerSquareClick(r, c) {
   }
   renderTrainerBoard();
 }
+
+/* ---- Arrow overlay showing the recommended move when a guess is wrong ---- */
+function trainerVisualCenter(r, c, turn) {
+  const order = turn === 'b' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  return { x: order.indexOf(c) + 0.5, y: order.indexOf(r) + 0.5 };
+}
+function clearTrainerArrow() {
+  const svg = document.getElementById('trainerArrowSvg');
+  const group = svg.querySelector('.trainer-arrow-line');
+  if (group) group.remove();
+}
+function drawTrainerArrow(fromRC, toRC, turn) {
+  clearTrainerArrow();
+  const svg = document.getElementById('trainerArrowSvg');
+  const a = trainerVisualCenter(fromRC.r, fromRC.c, turn);
+  const b = trainerVisualCenter(toRC.r, toRC.c, turn);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  // Shrink both ends so the line starts clear of the origin piece and stops
+  // just short of the target square, leaving room for the arrowhead.
+  const x1 = a.x + ux * 0.32, y1 = a.y + uy * 0.32;
+  const x2 = b.x - ux * 0.42, y2 = b.y - uy * 0.42;
+
+  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  group.setAttribute('class', 'trainer-arrow-line');
+
+  // Soft light halo first so the thin line still reads clearly against
+  // both light and dark squares.
+  const halo = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  halo.setAttribute('x1', x1); halo.setAttribute('y1', y1);
+  halo.setAttribute('x2', x2); halo.setAttribute('y2', y2);
+  halo.setAttribute('stroke', '#ffffff');
+  halo.setAttribute('stroke-width', '0.16');
+  halo.setAttribute('stroke-linecap', 'round');
+  halo.setAttribute('opacity', '0.7');
+  group.appendChild(halo);
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', '#1a9850');
+  line.setAttribute('stroke-width', '0.07');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('marker-end', 'url(#trainerArrowHead)');
+  group.appendChild(line);
+
+  svg.appendChild(group);
+}
+
 function submitTrainerGuess(move) {
   const g = trainerState.game;
   const rec = trainerState.currentRecord;
@@ -1970,7 +2031,8 @@ function submitTrainerGuess(move) {
   } else {
     const label = baseline ? coachMoveLabel(g, baseline.move) : '';
     feedback.className = 'coach-line show tone-hint';
-    feedback.textContent = '💡 Noch nicht ganz — ' + (label ? ('stark wäre ' + label + ' gewesen. ') : '') + 'Kein Problem, beim nächsten Mal klappt\'s bestimmt!';
+    feedback.textContent = '💡 Noch nicht ganz — ' + (label ? ('der grüne Pfeil zeigt dir einen starken Zug: ' + label + '. ') : '') + 'Kein Problem, beim nächsten Mal klappt\'s bestimmt!';
+    if (baseline) drawTrainerArrow(baseline.move.from, baseline.move.to, rec.turn);
   }
   updateMistakeStageAfterAttempt(rec.id, success);
   document.getElementById('trainerNextBtn').style.display = 'block';
