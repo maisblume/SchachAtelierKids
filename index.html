@@ -1642,12 +1642,27 @@ function evaluateCandidateSwing(move) {
   if (!baseline) return 0;
   return evaluateMoveSwing(state.game, baseline.score, move);
 }
+// Whether this move leaves one of the player's OWN pieces hanging (attacked
+// and undefended) right away — as opposed to merely not being the single
+// best move on the board (e.g. missing a free enemy piece elsewhere, which
+// produces the same kind of large negative "swing" but isn't actually
+// dangerous for the player). Only the former deserves an interrupting
+// confirmation.
+function moveHangsOwnMaterial(move) {
+  const g = state.game;
+  const color = g.turn;
+  const snap = snapshot(g);
+  g.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo || 'q' });
+  const hanging = findThreats(g, color);
+  restore(g, snap);
+  return hanging.length > 0;
+}
 
 function handleMoveSelection(move) {
   if (move.promotion) { openPromotionModal(move); return; }
   if (state.warnOnBlunder && state._coachBaseline) {
     const swing = evaluateCandidateSwing(move);
-    if (swing <= BLUNDER_SWING_THRESHOLD) { showWarumNichtPrompt(move, swing); return; }
+    if (swing <= BLUNDER_SWING_THRESHOLD && moveHangsOwnMaterial(move)) { showWarumNichtPrompt(move, swing); return; }
     commitMove(move, swing);
     return;
   }
@@ -1729,7 +1744,7 @@ function openPromotionModal(move) {
       const withPromo = { ...move, promoteTo: opt };
       if (state.warnOnBlunder && state._coachBaseline) {
         const swing = evaluateCandidateSwing(withPromo);
-        if (swing <= BLUNDER_SWING_THRESHOLD) { showWarumNichtPrompt(withPromo, swing); return; }
+        if (swing <= BLUNDER_SWING_THRESHOLD && moveHangsOwnMaterial(withPromo)) { showWarumNichtPrompt(withPromo, swing); return; }
         commitMove(withPromo, swing);
         return;
       }
