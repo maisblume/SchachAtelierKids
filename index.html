@@ -101,7 +101,7 @@ body {
 .streak-toast.show, .level-toast.show { opacity: 1; transform: translateX(-50%) translateY(6px); }
 
 /* ---- Board ---- */
-.board-wrap { margin-bottom: 4px; }
+.board-wrap { margin-bottom: 4px; position: relative; }
 .board {
   display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
   aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; width: 100%;
@@ -118,7 +118,11 @@ body {
 .sq .hint { position: absolute; width: 26%; height: 26%; border-radius: 50%; opacity: 0.55; background: #4a7fb5; }
 .sq .hint.capture { width: 80%; height: 80%; border-radius: 50%; background: transparent; border: 4px solid #e8899e; opacity: 0.55; }
 .sq.selected { outline: 3px solid #e8899e; outline-offset: -3px; }
-.sq.last-move::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0.18; pointer-events: none; }
+.sq.last-move::before { content: ''; position: absolute; inset: 0; background: #ffd23f; opacity: 0.55; pointer-events: none; }
+.sq.last-move-to { outline: 3px solid #e0a95a; outline-offset: -3px; }
+.board-arrow-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.board-arrow-line { opacity: 0; animation: boardArrowIn 0.3s ease 0.15s forwards; }
+@keyframes boardArrowIn { from { opacity: 0; } to { opacity: 0.95; } }
 .sq.in-check::after { content: ''; position: absolute; inset: 6%; border-radius: 50%; background: radial-gradient(circle, rgba(220,40,30,0.75) 0%, rgba(220,40,30,0.35) 55%, rgba(220,40,30,0) 80%); pointer-events: none; z-index: 1; }
 .coord-label { position: absolute; font-size: 12px; font-weight: 700; opacity: 0.6; pointer-events: none; line-height: 1; z-index: 3; }
 .coord-label.rank { top: 3px; left: 4px; }
@@ -223,6 +227,13 @@ body {
 
   <div class="board-wrap">
     <div class="board" id="board"></div>
+    <svg class="board-arrow-svg" id="boardArrowSvg" viewBox="0 0 8 8" preserveAspectRatio="none">
+      <defs>
+        <marker id="boardArrowHead" markerWidth="3.6" markerHeight="3.6" refX="3.0" refY="1.8" orient="auto" markerUnits="strokeWidth">
+          <polygon points="0 0.2, 3.6 1.8, 0 3.4" fill="#e0a95a"></polygon>
+        </marker>
+      </defs>
+    </svg>
   </div>
 
   <div class="controls" id="mainControlsRow" style="margin-top:10px;">
@@ -948,7 +959,7 @@ function algToRC(alg) {
 
 // A short guaranteed pause before any opponent move is shown, so it never
 // feels instant/jarring — makes the move easier to actually notice.
-const MIN_AI_MOVE_DELAY_MS = 700;
+const MIN_AI_MOVE_DELAY_MS = 900;
 function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 let state = {
@@ -1464,13 +1475,16 @@ function newGame() {
     renderStatus();
     (async () => {
       const [aiMove] = await Promise.all([Promise.resolve(getAIMove(state.game)), delay(MIN_AI_MOVE_DELAY_MS)]);
+      let startRect = null;
       if (aiMove) {
+        startRect = captureSquareRect(aiMove.from.r, aiMove.from.c);
         state.game.move({ from: aiMove.from, to: aiMove.to, castle: aiMove.castle, promoteTo: aiMove.promoteTo || 'q' });
         state.lastMove = { from: aiMove.from, to: aiMove.to };
         playMoveFeedback(!!aiMove.capture);
       }
       state.aiThinking = false;
       render();
+      if (aiMove) animatePieceSlide(aiMove.to, startRect);
       checkSituationTips();
       checkGameEndModal();
       saveGame();
@@ -1521,6 +1535,7 @@ function render() {
       if (state.selected && state.selected.r === r && state.selected.c === c) sqEl.classList.add('selected');
       if (state.lastMove && ((state.lastMove.from.r === r && state.lastMove.from.c === c) || (state.lastMove.to.r === r && state.lastMove.to.c === c))) {
         sqEl.classList.add('last-move');
+        if (state.lastMove.to.r === r && state.lastMove.to.c === c) sqEl.classList.add('last-move-to');
       }
       if (kingInCheck && kingInCheck.r === r && kingInCheck.c === c) sqEl.classList.add('in-check');
       const key = r + '-' + c;
@@ -1552,6 +1567,79 @@ function render() {
   renderCaptured();
   renderStatus();
   if (state.showMoveHistory) renderMoveHistory();
+
+  if (state.lastMove) drawBoardArrow(state.lastMove.from, state.lastMove.to);
+  else clearBoardArrow();
+}
+
+/* ---- Arrow overlay marking the last move played (by either side), so a
+   move — especially the fox's — stays clearly traceable after it lands. ---- */
+function boardVisualCenter(r, c) {
+  const { rows, cols } = boardCoords();
+  return { x: cols.indexOf(c) + 0.5, y: rows.indexOf(r) + 0.5 };
+}
+function clearBoardArrow() {
+  const svg = document.getElementById('boardArrowSvg');
+  const group = svg.querySelector('.board-arrow-line');
+  if (group) group.remove();
+}
+function drawBoardArrow(fromRC, toRC) {
+  clearBoardArrow();
+  const svg = document.getElementById('boardArrowSvg');
+  const a = boardVisualCenter(fromRC.r, fromRC.c);
+  const b = boardVisualCenter(toRC.r, toRC.c);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const x1 = a.x + ux * 0.32, y1 = a.y + uy * 0.32;
+  const x2 = b.x - ux * 0.42, y2 = b.y - uy * 0.42;
+
+  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  group.setAttribute('class', 'board-arrow-line');
+
+  const halo = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  halo.setAttribute('x1', x1); halo.setAttribute('y1', y1);
+  halo.setAttribute('x2', x2); halo.setAttribute('y2', y2);
+  halo.setAttribute('stroke', '#ffffff');
+  halo.setAttribute('stroke-width', '0.16');
+  halo.setAttribute('stroke-linecap', 'round');
+  halo.setAttribute('opacity', '0.75');
+  group.appendChild(halo);
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', '#e0a95a');
+  line.setAttribute('stroke-width', '0.08');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('marker-end', 'url(#boardArrowHead)');
+  group.appendChild(line);
+
+  svg.appendChild(group);
+}
+
+/* ---- Slide animation (FLIP) so a move is visibly traced across the board
+   instead of the piece just appearing at its new square. ---- */
+function captureSquareRect(r, c) {
+  const el = document.querySelector('#board .sq[data-r="' + r + '"][data-c="' + c + '"] .piece');
+  return el ? el.getBoundingClientRect() : null;
+}
+function animatePieceSlide(to, startRect) {
+  if (!startRect) return;
+  const el = document.querySelector('#board .sq[data-r="' + to.r + '"][data-c="' + to.c + '"] .piece');
+  if (!el) return;
+  const endRect = el.getBoundingClientRect();
+  const dx = startRect.left - endRect.left;
+  const dy = startRect.top - endRect.top;
+  if (!dx && !dy) return;
+  el.style.transition = 'none';
+  el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+  void el.offsetWidth; // force reflow so the starting position actually applies first
+  requestAnimationFrame(() => {
+    el.style.transition = 'transform 0.38s cubic-bezier(.3,.8,.4,1)';
+    el.style.transform = 'translate(0,0)';
+  });
+  el.addEventListener('transitionend', () => { el.style.transition = ''; el.style.transform = ''; }, { once: true });
 }
 
 function renderCaptured() {
@@ -1689,6 +1777,7 @@ function commitMove(move, precomputedSwing) {
   const coachBaseline = state._coachBaseline;
   const boardBeforeMove = state._coachBaselineBoard;
   const turnBeforeMove = state._coachBaselineTurn;
+  const playerStartRect = captureSquareRect(playedFrom.r, playedFrom.c);
   const found = g.move({ from: move.from, to: move.to, castle: move.castle, promoteTo: move.promoteTo });
   const san = found ? found.san : '';
   state.lastMove = { from: playedFrom, to: playedTo };
@@ -1706,6 +1795,7 @@ function commitMove(move, precomputedSwing) {
   state._pendingSwing = undefined;
 
   render();
+  animatePieceSlide(playedTo, playerStartRect);
   checkSituationTips();
   recordPlayerMoveQuality(coachBaseline, san, precomputedSwing, boardBeforeMove, turnBeforeMove, playedFrom, playedTo);
 
@@ -1717,13 +1807,16 @@ function commitMove(move, precomputedSwing) {
   saveGame();
   (async () => {
     const [aiMove] = await Promise.all([Promise.resolve(getAIMove(g)), delay(MIN_AI_MOVE_DELAY_MS)]);
+    let aiStartRect = null;
     if (aiMove) {
+      aiStartRect = captureSquareRect(aiMove.from.r, aiMove.from.c);
       g.move({ from: aiMove.from, to: aiMove.to, castle: aiMove.castle, promoteTo: aiMove.promoteTo || 'q' });
       state.lastMove = { from: aiMove.from, to: aiMove.to };
       playMoveFeedback(!!aiMove.capture);
     }
     state.aiThinking = false;
     render();
+    if (aiMove) animatePieceSlide(aiMove.to, aiStartRect);
     checkSituationTips();
     checkGameEndModal();
     saveGame();
